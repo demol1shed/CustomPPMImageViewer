@@ -35,7 +35,7 @@ sudo pacman -S mingw-w64-x86_64-SDL2
 ```
 
 #### For Visual Studio:
-Download the development libraries from the SDL GitHub and link them manually. Any other version than SDL2 will result in the program not building.
+Download the development libraries from the [SDL GitHub](https://github.com/libsdl-org/SDL/releases) and link them manually. Any other version than SDL2 will result in the program not building.
 
 ### MacOS
 For macOS systems you might want to have homebrew installed for convenience.
