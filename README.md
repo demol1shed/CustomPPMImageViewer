@@ -1,7 +1,7 @@
 # Custom PPM Image Viewer
 This is a lightweight, hardware accelerated C++ application for parsing and viewing **.ppm (Portable Pixel Map)** images. This project manually parses **ASCII based** .ppm files and renders them using the **SDL2** library. Support for **raw** .ppm files is something that is currently WIP. 
 
-Also, this program is horribly inefficient is simply me trying to challenge myself. Not only that the program itself is inefficient; the .ppm file format is also inefficient, quoted by netpbm.
+Also, this program is horribly inefficient and is simply me trying to challenge myself. Not only that the program itself is inefficient; the .ppm file format is also inefficient, quoted by netpbm.
 
 ## Features
 * **Custom Parser:** Manually reads .ppm files (only in the P3 format though.), handling headers, comments, empty spaces and different types of formatting data.
