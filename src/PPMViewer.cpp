@@ -1,4 +1,3 @@
-#include "PPMViewer.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_pixels.h>
@@ -11,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <ivInclude/PPMViewer.h>
 #include <strings.h>
 #include <vector>
 
