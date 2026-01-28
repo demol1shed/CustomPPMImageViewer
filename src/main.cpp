@@ -1,6 +1,5 @@
 #include <PPMViewer.h>
 #include <Parser.h>
-#include <SDL2/SDL_rect.h>
 #include <cstdint>
 #include <iostream>
 #include <vector>

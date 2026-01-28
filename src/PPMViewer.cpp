@@ -1,18 +1,5 @@
 #include <PPMViewer.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_events.h>
-#include <SDL2/SDL_pixels.h>
-#include <SDL2/SDL_rect.h>
-#include <SDL2/SDL_render.h>
-#include <SDL2/SDL_stdinc.h>
-#include <SDL2/SDL_surface.h>
-#include <SDL2/SDL_timer.h>
-#include <SDL2/SDL_video.h>
-#include <cstdio>
-#include <cstring>
 #include <iostream>
-#include <strings.h>
-#include <vector>
 
 PPMViewer::PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight,
                      int delay) {
