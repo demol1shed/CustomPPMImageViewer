@@ -17,7 +17,6 @@
 class PPMViewer {
 private:
   SDL_Window *pWin = nullptr;
-  SDL_Surface *pSur = nullptr;
   SDL_Renderer *pRen = nullptr;
   SDL_Texture *pTex = nullptr;
   int delay;
@@ -30,9 +29,5 @@ public:
   PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight,
             int delay);
   ~PPMViewer();
-  int OpenWindow(const SDL_Rect *pRect = NULL,
-                 Uint32 colorVal =
-                     0x000000FF); // paints the entire screen black by default.
-  void DrawPixels(SDL_Rect *pixel, Uint8 r, Uint8 g, Uint8 b);
   void DrawData();
 };

@@ -8,7 +8,7 @@ void Parser::PreParser(std::ifstream *file, std::string &ppmTypeBuf,
   std::string line;
   std::stringstream ss;
 
-  auto GetNextValidLine = [&]() {
+  auto GetNextValidLine = [&]() { // take all vars by reference
     while (std::getline(*file, line)) {
       if (line.empty())
         continue;
@@ -92,7 +92,7 @@ Parser::Parser(const std::string &filePath, std::string &ppmTypeBuf,
   std::ifstream file(filePath);
 
   if (!file.is_open()) {
-    std::cerr << "File at" << filePath << "could not be found or opened.\n";
+    std::cerr << "File at" << filePath << " could not be found or opened.\n";
     return;
   }
 

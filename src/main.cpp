@@ -5,13 +5,11 @@
 #include <iostream>
 #include <vector>
 
-#define SCREEN_WIDTH 1920
-#define SCREEN_HEIGHT 1080
 #define DELAYMS 5000
 
 int main(int argc, char *argv[]) {
 
-  if (argc < 2 && argc > 3) {
+  if (argc < 2 || argc > 3) {
     std::cerr << "Usage: " << argv[0] << " <path_to_ppm_file> [-v]"
               << std::endl;
     return 1;

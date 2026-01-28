@@ -55,52 +55,23 @@ PPMViewer::PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight,
 
 PPMViewer::~PPMViewer() {
   SDL_Delay(this->delay);
-  if (pTex)
+  if (PtrChecks()) {
     SDL_DestroyTexture(pTex);
-  if (pRen)
     SDL_DestroyRenderer(pRen);
-  if (pWin)
     SDL_DestroyWindow(pWin);
+  }
   SDL_Quit();
 }
 
-int PPMViewer::OpenWindow(const SDL_Rect *pRect, Uint32 colorVal) {
-  if (!pSur)
-    return -1;
-  int rVal = SDL_FillRect(pSur, pRect, colorVal);
-  rVal += SDL_UpdateWindowSurface(pWin);
-  SDL_Delay(this->delay);
-
-  return rVal;
-}
-
-void PPMViewer::DrawPixels(SDL_Rect *pixel, Uint8 r, Uint8 g, Uint8 b) {
-  if (!PtrChecks()) {
-    return;
-  }
-  Uint32 color = 0;
-  for (int y = 0; y < this->height; y++) {
-    for (int x = 0; x < this->width; x++) {
-      int index = (y * this->width) + x;
-      pixel->x = x;
-      pixel->y = y;
-      color = SDL_MapRGB(pSur->format, this->pixelData[index].r,
-                         this->pixelData[index].g, this->pixelData[index].b);
-      SDL_FillRect(pSur, pixel, color);
-    }
-  }
-  SDL_UpdateWindowSurface(pWin);
-}
-
 bool PPMViewer::PtrChecks() {
-  if (!pSur) {
+  if (!pRen || !pTex) {
     return false;
   }
   return true;
 }
 
 void PPMViewer::DrawData() {
-  if (!pRen || !pTex) {
+  if (!PtrChecks()) {
     return;
   }
   SDL_UpdateTexture(pTex, NULL, pixelData.data(), width * 3);
