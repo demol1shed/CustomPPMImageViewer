@@ -1,10 +1,10 @@
-CXX = g++
+CXX ?= c++
 CXXFLAGS = -I include -Wall -std=c++17 -g
 LDFLAGS = -lSDL2
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
-TARGET = main
+TARGET = view
 
 all: $(TARGET)
 $(TARGET): $(OBJ)
