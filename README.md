@@ -46,7 +46,7 @@ brew install sdl2
 ## Building 
 You can use the Makefile for easy compilation.
 
-After cloning the repository, simply run:
+After cloning the repository, simply run
 ``` make ```. This will generate an executable with the name ```view```.
 If you are on an UNIX like system, then run ```chmod +x view```. Then you are ready to go.
 
@@ -73,7 +73,7 @@ This will display the parsed header values of the .ppm file, such as type, maxVa
 └── README.md         # README file?
 ```
 
-## TODO
+## TODO:
 * Supporting raw binary (P6) format.
 * Add better window resizing and zooming, instead of warping the image to fit the screen.
 * Implement a better way of passing files to the program.
