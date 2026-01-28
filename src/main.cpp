@@ -1,8 +1,8 @@
+#include <PPMViewer.h>
+#include <Parser.h>
 #include <SDL2/SDL_rect.h>
 #include <cstdint>
 #include <iostream>
-#include <ivInclude/PPMViewer.h>
-#include <ivInclude/Parser.h>
 #include <vector>
 
 #define SCREEN_WIDTH 1920

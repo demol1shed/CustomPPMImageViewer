@@ -1,6 +1,6 @@
+#include <Parser.h>
 #include <fstream>
 #include <iostream>
-#include <ivInclude/Parser.h>
 #include <sstream>
 
 void Parser::PreParser(std::ifstream *file, std::string &ppmTypeBuf,
