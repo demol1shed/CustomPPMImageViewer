@@ -11,8 +11,37 @@ Also, this program is horribly inefficient is simply me trying to challenge myse
 ## Dependencies
 To build and run this project, all that you'll need is a C++ compiler and the **SDL2 Development Library**.
 
+### Debian/Ubuntu/Mint
+```bash
+sudo apt install g++ make libsdl2-dev
+```
+
+### Arch
+```bash
+sudo pacman -S sdl2
+```
+
+### Fedora
+```bash
+sudo dnf install SDL2-devel
+```
+
 ### Windows
 For Windows systems you will need to set up SDL2 with MinGW and Visual Studio. If using MinGW ensure that ```SDL2.dll``` is in your build directory.
+
+#### For MSYS2: 
+```bash
+sudo pacman -S mingw-w64-x86_64-SDL2
+```
+
+#### For Visual Studio:
+Download the development libraries from the SDL GitHub and link them manually. Any other version than SDL2 will result in the program not building.
+
+### MacOS
+For macOS systems you might want to have homebrew installed for convenience.
+```bash
+brew install sdl2
+```
 
 ## Building 
 You can use the Makefile for easy compilation.
@@ -23,12 +52,12 @@ If you are on an UNIX like system, then run ```chmod +x view```. Then you are re
 
 ## Usage
 ### Basic Usage
-```./view <path-to-your-image-file.ppm```
+```./view <path-to-your-image-file.ppm>```
 
 ### Verbose Flag
 ```./view <path-to-your-image-file.ppm> -v```
 
-This will display the parsed header values of the .ppm file, such as width, height etc. It will also print every single pixel's RGB values as well. Which will severely slow down the process of viewing the image, so use at your own risk.
+This will display the parsed header values of the .ppm file, such as type, maxVal, width etc. It will also print every single pixel's RGB values as well. Which will severely slow down the process of viewing the image, so use at your own risk.
 
 ## Project Structure
 ```
@@ -41,7 +70,7 @@ This will display the parsed header values of the .ppm file, such as width, heig
 │   ├── Parser.cpp    # Implementation for file reading and parsing information
 │   └── PPMViewer.cpp # Implementation for window creation and rendering the image
 ├── Makefile          # Build configuration
-└── README.md         # readme file?
+└── README.md         # README file?
 ```
 
 ## TODO
