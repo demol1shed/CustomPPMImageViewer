@@ -49,14 +49,12 @@ PPMViewer::~PPMViewer() {
   }
   SDL_Quit();
 }
-
 bool PPMViewer::PtrChecks() {
   if (!pRen || !pTex) {
     return false;
   }
   return true;
 }
-
 void PPMViewer::DrawData() {
   if (!PtrChecks()) {
     return;
