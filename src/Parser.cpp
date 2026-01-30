@@ -94,16 +94,18 @@ void Parser::BodyParser(std::ifstream *file, std::vector<Pixel> &pixelBuf,
       pixelBuf[i].r = r;
       pixelBuf[i].g = g;
       pixelBuf[i].b = b;
-      if (verbose) {
-        printf("pixelData of pixel %d: [%d, %d, %d]\n", i, pixelBuf[i].r,
-               pixelBuf[i].g, pixelBuf[i].b);
-      }
     }
   }
 
   if (verbose) {
     std::cout << "Body of the file has been loaded\nLoaded pixel count: "
               << totalPixelCount << "  pixels.\n";
+  }
+
+  if (verbose) {
+    for (int i = 0; i < totalPixelCount; i++)
+      printf("pixelData of pixel %d: [%d, %d, %d]\n", i, pixelBuf[i].r,
+             pixelBuf[i].g, pixelBuf[i].b);
   }
 }
 

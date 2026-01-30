@@ -12,7 +12,7 @@ private:
   SDL_Renderer *pRen = nullptr;
   SDL_Texture *pTex = nullptr;
   std::vector<Pixel> pixelData; // at some point rename to pixelBuffer
-  int width, height;
+  int width, height;            // carry to Image.h at some point
 
   bool PtrChecks();
 
