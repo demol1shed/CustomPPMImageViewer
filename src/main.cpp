@@ -4,8 +4,6 @@
 #include <iostream>
 #include <vector>
 
-#define DELAYMS 5000
-
 int main(int argc, char *argv[]) {
 
   if (argc < 2 || argc > 3) {
@@ -40,11 +38,7 @@ int main(int argc, char *argv[]) {
 
   Parser dataParser(filePath, ppmType, widthHeight, maxVal, pixelBuffer,
                     verbose);
-  PPMViewer imageViewer(
-      pixelBuffer, widthHeight,
-      DELAYMS); // lives on the stack, i don't leave main for now.
-  // SDL_Rect pixel = (SDL_Rect){0, 0, 1, 1};
-  // imageViewer.DrawPixels(&pixel, 0, 0, 0);
+  PPMViewer imageViewer(pixelBuffer, widthHeight);
   imageViewer.DrawData();
   return 0;
 }

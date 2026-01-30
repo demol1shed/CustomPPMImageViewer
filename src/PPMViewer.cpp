@@ -1,13 +1,14 @@
 #include <PPMViewer.h>
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_keycode.h>
 #include <iostream>
 
-PPMViewer::PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight,
-                     int delay) {
+PPMViewer::PPMViewer(std::vector<Pixel> pixelData,
+                     std::vector<int> widthHeight) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "SDL could not be initialized\nError: " << SDL_GetError()
               << "\n";
   }
-  this->delay = delay;
   this->pixelData = pixelData;
   this->width = widthHeight[0];
   this->height = widthHeight[1];
@@ -41,7 +42,7 @@ PPMViewer::PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight,
 }
 
 PPMViewer::~PPMViewer() {
-  SDL_Delay(this->delay);
+  // SDL_Delay(this->delay);
   if (PtrChecks()) {
     SDL_DestroyTexture(pTex);
     SDL_DestroyRenderer(pRen);
@@ -64,4 +65,20 @@ void PPMViewer::DrawData() {
   SDL_RenderClear(pRen);
   SDL_RenderCopy(pRen, pTex, NULL, NULL);
   SDL_RenderPresent(pRen);
+
+  bool quit = false;
+  SDL_Event quitEvent;
+
+  while (!quit && SDL_WaitEvent(&quitEvent)) {
+    switch (quitEvent.type) {
+    case SDL_QUIT:
+      quit = true;
+      break;
+    case SDL_KEYDOWN:
+      if (quitEvent.key.keysym.sym == SDLK_ESCAPE) {
+        quit = true;
+      }
+      break;
+    }
+  }
 }
