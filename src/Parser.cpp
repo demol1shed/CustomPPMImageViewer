@@ -1,3 +1,4 @@
+#include "Pixel.h"
 #include <Parser.h>
 #include <fstream>
 #include <iostream>
@@ -62,23 +63,44 @@ void Parser::PreParser(std::ifstream *file, std::string &ppmTypeBuf,
 }
 
 void Parser::BodyParser(std::ifstream *file, std::vector<Pixel> &pixelBuf,
-                        int width, int height) {
+                        const std::string &ppmType, int width, int height) {
   pixelBuf.resize(width * height);
-
-  int r, g, b;
   int totalPixelCount = width * height;
 
-  for (int i = 0; i < totalPixelCount; i++) {
-    *file >> r >> g >> b;
+  if (ppmType == "P6") { // binary data
+    // what if whitespace byte after header data?
+    file->get();
+    file->read(reinterpret_cast<char *>(pixelBuf.data()),
+               totalPixelCount *
+                   sizeof(Pixel)); // reinterpret the first Pixel type to a
+                                   // char* for read() to work
 
-    pixelBuf[i].r = r;
-    pixelBuf[i].g = g;
-    pixelBuf[i].b = b;
     if (verbose) {
-      printf("pixelData of pixel %d: [%d, %d, %d]\n", i, pixelBuf[i].r,
-             pixelBuf[i].g, pixelBuf[i].b);
+      std::cout << "Raw type .ppm file found, bytes read: " << file->gcount()
+                << "\n";
+    }
+
+  } else {
+    int r, g, b;
+
+    if (verbose) {
+      std::cout << "ASCII type .ppm file found, read pixel count: "
+                << totalPixelCount << "\n";
+    }
+
+    for (int i = 0; i < totalPixelCount; i++) {
+      *file >> r >> g >> b;
+
+      pixelBuf[i].r = r;
+      pixelBuf[i].g = g;
+      pixelBuf[i].b = b;
+      if (verbose) {
+        printf("pixelData of pixel %d: [%d, %d, %d]\n", i, pixelBuf[i].r,
+               pixelBuf[i].g, pixelBuf[i].b);
+      }
     }
   }
+
   if (verbose) {
     std::cout << "Body of the file has been loaded\nLoaded pixel count: "
               << totalPixelCount << "  pixels.\n";
@@ -89,7 +111,7 @@ Parser::Parser(const std::string &filePath, std::string &ppmTypeBuf,
                std::vector<int> &widthHeightBuf, uint8_t &maxValBuf,
                std::vector<Pixel> &pixelBuf, bool verbose) {
   this->verbose = verbose;
-  std::ifstream file(filePath);
+  std::ifstream file(filePath, std::ios::binary);
 
   if (!file.is_open()) {
     std::cerr << "File at" << filePath << " could not be found or opened.\n";
@@ -98,7 +120,7 @@ Parser::Parser(const std::string &filePath, std::string &ppmTypeBuf,
 
   PreParser(&file, ppmTypeBuf, widthHeightBuf, maxValBuf);
 
-  BodyParser(&file, pixelBuf, widthHeightBuf[0], widthHeightBuf[1]);
+  BodyParser(&file, pixelBuf, ppmTypeBuf, widthHeightBuf[0], widthHeightBuf[1]);
 }
 
 Parser::~Parser() {}
