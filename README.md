@@ -4,7 +4,7 @@ This is a lightweight, hardware accelerated C++ application for parsing and view
 Also, this program is horribly inefficient and is simply me trying to challenge myself. Not only that the program itself is inefficient; the .ppm file format is also inefficient, quoted by netpbm.
 
 ## Features
-* **Custom Parser:** Manually reads .ppm files (only in the P3 format though.), handling headers, comments, empty spaces and different types of formatting data.
+* **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
 * **Smart Windowing**(kind of)**:** Automatically resizes the window according to the size of the image. No zooming system though. If the image is larger than the dimensions of your screen, the image may appear warped in order to fit your screen.
 
