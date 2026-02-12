@@ -3,7 +3,7 @@
 #include <SDL2/SDL_keycode.h>
 #include <iostream>
 
-PPMViewer::PPMViewer(std::vector<Pixel> pixelData,
+PPMViewer::PPMViewer(const std::vector<Pixel> &pixelData,
                      std::vector<int> widthHeight) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "SDL could not be initialized\nError: " << SDL_GetError()
