@@ -3,15 +3,15 @@
 #include <SDL2/SDL_keycode.h>
 #include <iostream>
 
-PPMViewer::PPMViewer(std::vector<Pixel> pixelData,
-                     std::vector<int> widthHeight) {
+PPMViewer::PPMViewer(const std::vector<Pixel> &pixelData, int width,
+                     int height) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "SDL could not be initialized\nError: " << SDL_GetError()
               << "\n";
   }
   this->pixelData = pixelData;
-  this->width = widthHeight[0];
-  this->height = widthHeight[1];
+  this->width = width;
+  this->height = height;
 
   SDL_DisplayMode dm;
   int windowW = this->width;

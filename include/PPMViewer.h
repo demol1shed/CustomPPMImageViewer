@@ -17,7 +17,7 @@ private:
   bool PtrChecks();
 
 public:
-  PPMViewer(std::vector<Pixel> pixelData, std::vector<int> widthHeight);
+  PPMViewer(const std::vector<Pixel> &pixelData, int width, int height);
   ~PPMViewer();
   void DrawData();
 };
