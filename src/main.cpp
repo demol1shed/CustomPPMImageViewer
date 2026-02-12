@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
   //                   verbose);
   if (auto image = Parser::ParseFile(filePath, verbose)) {
     std::vector<int> dimensions = {image->width, image->height};
-    PPMViewer imageViewer(image->pixelData, widthHeight);
+    PPMViewer imageViewer(image->pixelData, dimensions);
     imageViewer.DrawData();
   }
 
