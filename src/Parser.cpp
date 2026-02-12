@@ -6,6 +6,7 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <string>
 std::optional<RawImage> Parser::ParseFile(const std::string &filePath,
                                           bool verbose) {
   std::ifstream file(filePath, std::ios::binary);
@@ -19,10 +20,15 @@ std::optional<RawImage> Parser::ParseFile(const std::string &filePath,
   std::stringstream ss;
   auto GetNextValidLine = [&]() { // take all vars by reference
     while (std::getline(file, line)) {
-      if (line.empty())
+      size_t commentPos = line.find("#");
+      if (commentPos != std::string::npos) {
+        line = line.substr(0, commentPos);
+      }
+
+      if (line.empty() ||
+          line.find_first_not_of(" \t\r\n") == std::string::npos)
         continue;
-      if (line[0] == '#')
-        continue;
+
       return true;
     }
     return false;
