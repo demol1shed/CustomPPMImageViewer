@@ -2,6 +2,7 @@
 #include <Parser.h>
 #include <cstdint>
 #include <iostream>
+#include <utility>
 #include <vector>
 
 int main(int argc, char *argv[]) {
@@ -31,14 +32,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  std::string ppmType;
-  std::vector<int> widthHeight;
-  uint8_t maxVal;
-  std::vector<Pixel> pixelBuffer;
+  if (auto image = Parser::ParseFile(filePath, verbose)) {
+    PPMViewer imageViewer(image->pixelData, image->width, image->height);
+    imageViewer.DrawData();
+  }
 
-  Parser dataParser(filePath, ppmType, widthHeight, maxVal, pixelBuffer,
-                    verbose);
-  PPMViewer imageViewer(pixelBuffer, widthHeight);
-  imageViewer.DrawData();
   return 0;
 }

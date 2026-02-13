@@ -1,10 +1,10 @@
 # Custom PPM Image Viewer
-This is a lightweight, hardware accelerated C++ application for parsing and viewing **.ppm (Portable Pixel Map)** images. This project manually parses **ASCII based** .ppm files and renders them using the **SDL2** library. Support for **raw** .ppm files is something that is currently WIP. 
+This is a lightweight, hardware accelerated C++ application for parsing and viewing **.ppm (Portable Pixel Map)** images. This project manually parses **ASCII based** and **raw** .ppm files and renders them using the **SDL2** library.
 
 Also, this program is horribly inefficient and is simply me trying to challenge myself. Not only that the program itself is inefficient; the .ppm file format is also inefficient, quoted by netpbm.
 
 ## Features
-* **Custom Parser:** Manually reads .ppm files (only in the P3 format though.), handling headers, comments, empty spaces and different types of formatting data.
+* **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
 * **Smart Windowing**(kind of)**:** Automatically resizes the window according to the size of the image. No zooming system though. If the image is larger than the dimensions of your screen, the image may appear warped in order to fit your screen.
 
@@ -74,7 +74,6 @@ This will display the parsed header values of the .ppm file, such as type, maxVa
 ```
 
 ## TODO:
-* Supporting raw binary (P6) format.
 * Add better window resizing and zooming, instead of warping the image to fit the screen.
 * Implement a better way of passing files to the program.
 * Support for different formats?  

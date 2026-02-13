@@ -1,20 +1,21 @@
 #pragma once
-#include <Pixel.h>
+#include "Pixel.h"
 #include <cstdint> // also included in Pixel.h
+#include <optional>
 #include <string>
 #include <vector>
 
-class Parser {
-private:
-  bool verbose = false;
-  void PreParser(std::ifstream *file, std::string &ppmTypeBuf,
-                 std::vector<int> &widthHeightBuf, uint8_t &maxValBuf);
-  void BodyParser(std::ifstream *file, std::vector<Pixel> &pixelBuf,
-                  const std::string &ppmType, int width, int height);
+struct RawImage {
+  int width = 0;
+  int height = 0;
+  std::string ppmType;
+  uint8_t maxVal = 255;
+  std::vector<Pixel> pixelData;
+};
 
+class Parser {
 public:
-  Parser(const std::string &filePath, std::string &ppmTypeBuf,
-         std::vector<int> &widthHeightBuf, uint8_t &maxValBuf,
-         std::vector<Pixel> &pixelBuf, bool verbose);
-  ~Parser();
+  static std::optional<RawImage>
+  ParseFile(const std::string &filePath,
+            bool verbose = false); // returns nullopt if parsing fails
 };

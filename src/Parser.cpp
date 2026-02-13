@@ -1,128 +1,114 @@
 #include "Pixel.h"
 #include <Parser.h>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
+#include <string>
+std::optional<RawImage> Parser::ParseFile(const std::string &filePath,
+                                          bool verbose) {
+  std::ifstream file(filePath, std::ios::binary);
+  if (!file.is_open()) {
+    std::cerr << "File at" << filePath << " could not be found or opened.\n";
+    return std::nullopt;
+  }
 
-void Parser::PreParser(std::ifstream *file, std::string &ppmTypeBuf,
-                       std::vector<int> &widthHeightBuf, uint8_t &maxValBuf) {
+  RawImage image;
   std::string line;
   std::stringstream ss;
-
   auto GetNextValidLine = [&]() { // take all vars by reference
-    while (std::getline(*file, line)) {
-      if (line.empty())
-        continue;
-      if (line[0] == '#')
-        continue;
-      return;
-    }
-  }; // if line is empty or is a comment, skip
+    while (std::getline(file, line)) {
+      size_t commentPos = line.find("#");
+      if (commentPos != std::string::npos) {
+        line = line.substr(0, commentPos);
+      }
 
-  // line 1 -> ppmType
-  GetNextValidLine();
+      if (line.empty() ||
+          line.find_first_not_of(" \t\r\n") == std::string::npos)
+        continue;
+
+      return true;
+    }
+    return false;
+  };
+
+  // getting ppm type
+  if (!GetNextValidLine())
+    return std::nullopt;
   ss.clear();
   ss.str(line);
-  ss >> ppmTypeBuf;
+  ss >> image.ppmType;
 
-  // line 2 -> width and height
+  // getting width and height
   int w = -1, h = -1;
-  while (w == -1 || h == -1) { // width and height may be in different lines?
+  while (w == -1 || h == -1) {
     if (ss.eof()) {
-      GetNextValidLine();
+      if (!GetNextValidLine())
+        return std::nullopt;
       ss.clear();
       ss.str(line);
     }
-    // try and read vals
     if (w == -1)
       ss >> w;
+    // width and height may be in differnt lines
+    if (ss.eof() && h == -1) {
+      if (!GetNextValidLine())
+        return std::nullopt;
+      ss.clear();
+      ss.str(line);
+    }
     if (h == -1)
       ss >> h;
   }
 
-  if (widthHeightBuf.size() < 2)
-    widthHeightBuf.resize(2);
-  widthHeightBuf[0] = w;
-  widthHeightBuf[1] = h;
+  image.width = w;
+  image.height = h;
 
-  // line 3 -> max val
-  int maxValInt;
+  // getting maxVal
+  int maxValInt = 0;
   if (ss.eof()) {
-    GetNextValidLine();
+    if (!GetNextValidLine())
+      return std::nullopt;
     ss.clear();
     ss.str(line);
   }
   ss >> maxValInt;
-  maxValBuf = (uint8_t)maxValInt;
+  image.maxVal = static_cast<uint8_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
-              << ppmTypeBuf << "\nImage size: " << widthHeightBuf[0] << ","
-              << widthHeightBuf[1] << "\n"
-              << "Color maximum value: " << maxValInt << "\n";
+              << image.ppmType << "\nImage size: " << image.width << ","
+              << image.height << "\n"
+              << "Color maximum value: " << image.maxVal << "\n";
   }
-}
 
-void Parser::BodyParser(std::ifstream *file, std::vector<Pixel> &pixelBuf,
-                        const std::string &ppmType, int width, int height) {
-  pixelBuf.resize(width * height);
-  int totalPixelCount = width * height;
+  // parsing pixel data
+  size_t totalPixels = image.width * image.height;
+  image.pixelData.resize(totalPixels);
 
-  if (ppmType == "P6") { // binary data
-    // what if whitespace byte after header data?
-    file->get();
-    file->read(reinterpret_cast<char *>(pixelBuf.data()),
-               totalPixelCount *
-                   sizeof(Pixel)); // reinterpret the first Pixel type to a
-                                   // char* for read() to work
+  if (image.ppmType == "P6") {
+    // raw ppm
+    file.read(reinterpret_cast<char *>(image.pixelData.data()),
+              totalPixels * sizeof(Pixel));
 
     if (verbose) {
-      std::cout << "Raw type .ppm file found, bytes read: " << file->gcount()
-                << "\n";
+      std::cout << "Binary P6 data read. Bytes: " << file.gcount() << "\n";
     }
-
   } else {
+    // ascii mode
     int r, g, b;
+    for (size_t i = 0; i < totalPixels; i++) {
+      file >> r >> g >> b;
+      image.pixelData[i] = {static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                            static_cast<uint8_t>(b)};
+    }
 
     if (verbose) {
-      std::cout << "ASCII type .ppm file found, read pixel count: "
-                << totalPixelCount << "\n";
-    }
 
-    for (int i = 0; i < totalPixelCount; i++) {
-      *file >> r >> g >> b;
-
-      pixelBuf[i].r = r;
-      pixelBuf[i].g = g;
-      pixelBuf[i].b = b;
+      std::cout << "ASCII P3 data read.\n";
     }
   }
 
-  if (verbose) {
-    std::cout << "Body of the file has been loaded\nLoaded pixel count: "
-              << totalPixelCount << "  pixels.\n";
-  }
-
-  if (verbose) {
-    for (int i = 0; i < totalPixelCount; i++)
-      printf("pixelData of pixel %d: [%d, %d, %d]\n", i, pixelBuf[i].r,
-             pixelBuf[i].g, pixelBuf[i].b);
-  }
+  return image;
 }
-
-Parser::Parser(const std::string &filePath, std::string &ppmTypeBuf,
-               std::vector<int> &widthHeightBuf, uint8_t &maxValBuf,
-               std::vector<Pixel> &pixelBuf, bool verbose) {
-  this->verbose = verbose;
-  std::ifstream file(filePath, std::ios::binary);
-
-  if (!file.is_open()) {
-    std::cerr << "File at" << filePath << " could not be found or opened.\n";
-    return;
-  }
-
-  PreParser(&file, ppmTypeBuf, widthHeightBuf, maxValBuf);
-
-  BodyParser(&file, pixelBuf, ppmTypeBuf, widthHeightBuf[0], widthHeightBuf[1]);
-}
-
-Parser::~Parser() {}
