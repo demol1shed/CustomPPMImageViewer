@@ -37,7 +37,9 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+  if (SDL_Init(SDL_INIT_VIDEO) <
+      0) { // maybe add a getDisplayMode method to PPMViewer.cpp and avoid
+           // initializing twice?
     std::cerr << "Could not initialize SDL to get screen size" << std::endl;
     return 1;
   }

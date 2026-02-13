@@ -23,8 +23,8 @@ Pixel BilinearLerper::SampleBilinear(Image *source, float u, float v) {
   int x = std::floor(u);
   int y = std::floor(v);
 
-  int deltaX = u - x;
-  int deltaY = v - y;
+  float deltaX = u - x;
+  float deltaY = v - y;
 
   Pixel topLeft = source->pixelData[GiveFlattenedIndexOf(
       source->width, y,
