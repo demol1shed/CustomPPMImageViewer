@@ -4,6 +4,7 @@
 #include <vector>
 
 BilinearLerper::BilinearLerper() {}
+BilinearLerper::~BilinearLerper() {}
 
 Pixel BilinearLerper::Lerp(Pixel a, Pixel b, float d) {
   Pixel result;
@@ -26,19 +27,18 @@ Pixel BilinearLerper::SampleBilinear(Image *source, float u, float v) {
   int deltaY = v - y;
 
   Pixel topLeft = source->pixelData[GiveFlattenedIndexOf(
-      source->sourceWidth, y,
+      source->width, y,
       x)]; // i represents the y coordinate, j represents the x coordinate
   Pixel topRight =
-      source->pixelData[GiveFlattenedIndexOf(source->sourceWidth, y, x + 1)];
+      source->pixelData[GiveFlattenedIndexOf(source->width, y, x + 1)];
   Pixel bottomLeft =
-      source->pixelData[GiveFlattenedIndexOf(source->sourceWidth, y + 1, x)];
+      source->pixelData[GiveFlattenedIndexOf(source->width, y + 1, x)];
   Pixel bottomRight =
-      source
-          ->pixelData[GiveFlattenedIndexOf(source->sourceWidth, y + 1, x + 1)];
+      source->pixelData[GiveFlattenedIndexOf(source->width, y + 1, x + 1)];
 
   // formula: delta * (val2 - val1) + val1
   Pixel topColor = Lerp(topLeft, topRight, deltaX);
-  Pixel bottomColor = Lerp(bottomLeft, bottomRight, deltaY);
+  Pixel bottomColor = Lerp(bottomLeft, bottomRight, deltaX);
 
   // final vertical interpolation
   Pixel finalColor = Lerp(topColor, bottomColor, deltaY);

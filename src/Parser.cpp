@@ -7,15 +7,15 @@
 #include <optional>
 #include <sstream>
 #include <string>
-std::optional<RawImage> Parser::ParseFile(const std::string &filePath,
-                                          bool verbose) {
+std::optional<Image> Parser::ParseFile(const std::string &filePath,
+                                       bool verbose) {
   std::ifstream file(filePath, std::ios::binary);
   if (!file.is_open()) {
     std::cerr << "File at" << filePath << " could not be found or opened.\n";
     return std::nullopt;
   }
 
-  RawImage image;
+  Image image;
   std::string line;
   std::stringstream ss;
   auto GetNextValidLine = [&]() { // take all vars by reference
