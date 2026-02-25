@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  std::string filePath = argv[1];
+  std::string filePath = "";
   bool verbose = false;
 
   for (int i = 1; i < argc; i++) {
@@ -37,9 +37,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (SDL_Init(SDL_INIT_VIDEO) <
-      0) { // maybe add a getDisplayMode method to PPMViewer.cpp and avoid
-           // initializing twice?
+  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "Could not initialize SDL to get screen size" << std::endl;
     return 1;
   }
@@ -75,11 +73,11 @@ int main(int argc, char *argv[]) {
 
     // allocate processed buffer for the new image
     std::vector<Pixel> processedBuffer(windowWidth * windowHeight);
-    InverseMap map(sourceImage, vState, processedBuffer.data(), windowWidth,
-                   windowHeight);
+    InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
+                                windowWidth, windowHeight);
 
-    PPMViewer imageViewer(processedBuffer, windowWidth, windowHeight);
-    imageViewer.DrawData();
+    PPMViewer imageViewer(windowWidth, windowHeight);
+    imageViewer.DrawData(processedBuffer);
   }
 
   return 0;

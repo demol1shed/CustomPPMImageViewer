@@ -8,7 +8,5 @@ private:
   int GiveFlattenedIndexOf(int w, int i, int j); // w being column count
 
 public:
-  BilinearLerper();
-  ~BilinearLerper();
-  Pixel SampleBilinear(Image *source, float u, float v);
+  Pixel SampleBilinear(const Image *source, float u, float v);
 };

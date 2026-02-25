@@ -3,9 +3,6 @@
 #include <cmath>
 #include <vector>
 
-BilinearLerper::BilinearLerper() {}
-BilinearLerper::~BilinearLerper() {}
-
 Pixel BilinearLerper::Lerp(Pixel a, Pixel b, float d) {
   Pixel result;
   result.r = d * (b.r - a.r) + a.r;
@@ -19,7 +16,7 @@ int BilinearLerper::GiveFlattenedIndexOf(int d, int i, int j) {
   return (i * d) + j;
 }
 
-Pixel BilinearLerper::SampleBilinear(Image *source, float u, float v) {
+Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
   int x = std::floor(u);
   int y = std::floor(v);
 

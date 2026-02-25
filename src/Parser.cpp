@@ -74,8 +74,13 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     ss.clear();
     ss.str(line);
   }
+  if (maxValInt > 255) {
+    std::cerr << "Error: 16 bit ppms are not supported. MaxVal is " << maxValInt
+              << "\n";
+    return std::nullopt;
+  }
   ss >> maxValInt;
-  image.maxVal = static_cast<uint8_t>(maxValInt);
+  image.maxVal = static_cast<uint16_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
               << image.ppmType << "\nImage size: " << image.width << ","

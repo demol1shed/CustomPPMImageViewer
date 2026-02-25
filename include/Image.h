@@ -1,5 +1,6 @@
 #pragma once
 #include "Pixel.h"
+#include <cstdint>
 #include <string>
 #include <vector>
 
