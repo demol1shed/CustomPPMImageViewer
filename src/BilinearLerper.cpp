@@ -3,9 +3,6 @@
 #include <cmath>
 #include <vector>
 
-BilinearLerper::BilinearLerper() {}
-BilinearLerper::~BilinearLerper() {}
-
 Pixel BilinearLerper::Lerp(Pixel a, Pixel b, float d) {
   Pixel result;
   result.r = d * (b.r - a.r) + a.r;

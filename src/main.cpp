@@ -73,8 +73,8 @@ int main(int argc, char *argv[]) {
 
     // allocate processed buffer for the new image
     std::vector<Pixel> processedBuffer(windowWidth * windowHeight);
-    InverseMap map(sourceImage, vState, processedBuffer.data(), windowWidth,
-                   windowHeight);
+    InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
+                                windowWidth, windowHeight);
 
     PPMViewer imageViewer(windowWidth, windowHeight);
     imageViewer.DrawData(processedBuffer);
