@@ -8,6 +8,6 @@ struct Image {
   int width = 0;
   int height = 0;
   std::string ppmType;
-  uint16_t maxVal = 255;
+  uint8_t maxVal = 255;
   std::vector<Pixel> pixelData;
 };
