@@ -5,7 +5,8 @@
 
 class InverseMap {
 public:
-  InverseMap(Image source, ViewState vState, Pixel *screenBuffer,
-             int screenWidth, int screenHeight);
+  InverseMap();
   ~InverseMap();
+  void ApplyInverseMap(const Image &source, ViewState vState,
+                       Pixel *screenBuffer, int screenWidth, int screenHeight);
 };

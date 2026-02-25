@@ -1,8 +1,9 @@
 #include <BilinearLerper.h>
 #include <InverseMap.h>
 
-InverseMap::InverseMap(Image source, ViewState vState, Pixel *screenBuf,
-                       int screenWidth, int screenHeight) {
+void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
+                                 Pixel *screenBuf, int screenWidth,
+                                 int screenHeight) {
   BilinearLerper lerper;
   for (int y = 0; y < screenHeight; y++) {
     for (int x = 0; x < screenWidth; x++) {
@@ -17,5 +18,7 @@ InverseMap::InverseMap(Image source, ViewState vState, Pixel *screenBuf,
     }
   }
 }
+
+InverseMap::InverseMap() {}
 
 InverseMap::~InverseMap() {}

@@ -10,5 +10,5 @@ private:
 public:
   BilinearLerper();
   ~BilinearLerper();
-  Pixel SampleBilinear(Image *source, float u, float v);
+  Pixel SampleBilinear(const Image *source, float u, float v);
 };

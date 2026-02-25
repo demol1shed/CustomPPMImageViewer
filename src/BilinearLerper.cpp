@@ -19,7 +19,7 @@ int BilinearLerper::GiveFlattenedIndexOf(int d, int i, int j) {
   return (i * d) + j;
 }
 
-Pixel BilinearLerper::SampleBilinear(Image *source, float u, float v) {
+Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
   int x = std::floor(u);
   int y = std::floor(v);
 

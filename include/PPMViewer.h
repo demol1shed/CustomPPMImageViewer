@@ -11,13 +11,12 @@ private:
   SDL_Window *pWin = nullptr;
   SDL_Renderer *pRen = nullptr;
   SDL_Texture *pTex = nullptr;
-  std::vector<Pixel> pixelData; // at some point rename to pixelBuffer
-  int width, height;            // carry to Image.h at some point
+  int width, height; // carry to Image.h at some point
 
   bool PtrChecks();
 
 public:
-  PPMViewer(const std::vector<Pixel> &pixelData, int width, int height);
+  PPMViewer(int width, int height);
   ~PPMViewer();
-  void DrawData();
+  void DrawData(const std::vector<Pixel> &pixelData);
 };
