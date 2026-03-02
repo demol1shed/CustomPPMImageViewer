@@ -74,6 +74,7 @@ This will display the parsed header values of the .ppm file, such as type, maxVa
 ```
 
 ## TODO:
-* Add better window resizing and zooming, instead of warping the image to fit the screen.
+* Multithreaded ASCII parsing.
+* Interactive panning and zooming system.
 * Implement a better way of passing files to the program.
 * Support for different formats?  
