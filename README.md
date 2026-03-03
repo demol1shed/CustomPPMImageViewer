@@ -6,7 +6,7 @@ Also, this program is horribly inefficient and is simply me trying to challenge 
 ## Features
 * **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
-* **Smart Windowing**(kind of)**:** Automatically resizes the window according to the size of the image. No zooming system though. If the image is larger than the dimensions of your screen, the image may appear warped in order to fit your screen.
+* **Smart Windowing:** Automatically resizes the window and the image according to the size of the image.
 
 ## Dependencies
 To build and run this project, all that you'll need is a C++ compiler and the **SDL2 Development Library**.
