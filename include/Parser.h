@@ -1,10 +1,7 @@
 #pragma once
 #include "Image.h"
-#include "Pixel.h"
-#include <cstdint> // also included in Pixel.h
 #include <optional>
 #include <string>
-#include <vector>
 
 class Parser {
 public:

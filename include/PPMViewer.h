@@ -3,9 +3,6 @@
 #include <SDL2/SDL.h>
 #include <vector>
 
-#define SCREEN_WIDTH 1920
-#define SCREEN_HEIGHT 1080
-
 class PPMViewer {
 private:
   SDL_Window *pWin = nullptr;
