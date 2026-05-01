@@ -86,9 +86,9 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
   image.maxVal = static_cast<uint16_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
-              << image.ppmType << "\nImage size: " << image.width << ","
+              << image.ppmType << "\nImage size: " << image.width << ", "
               << image.height << "\n"
-              << "Color maximum value: " << image.maxVal << "\n";
+              << "Color maximum value: " << maxValInt << "\n";
   }
 
   // parsing pixel data
