@@ -8,23 +8,21 @@ PPMViewer::PPMViewer(int width, int height) {
   this->height = height;
 
   SDL_DisplayMode dm;
-  int windowW = this->width;
-  int windowH = this->height;
 
   if (SDL_GetDesktopDisplayMode(0, &dm) == 0) {
     // clamp image width if larger
-    if (windowW > dm.w) {
-      windowW = dm.w;
+    if (this->width > dm.w) {
+      this->width = dm.w;
     }
     // clamp image height if larger
-    if (windowH > dm.h) {
-      windowH = dm.h;
+    if (this->height > dm.h) {
+      this->height = dm.h;
     }
   } else {
     std::cerr << "Warning: Could not get display mode. Using image size.\n";
   }
   pWin = SDL_CreateWindow("PPM Image Viewer", SDL_WINDOWPOS_CENTERED,
-                          SDL_WINDOWPOS_CENTERED, windowW, windowH,
+                          SDL_WINDOWPOS_CENTERED, this->width, this->height,
                           SDL_WINDOW_SHOWN);
   if (pWin) {
     pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_ACCELERATED);
@@ -36,7 +34,6 @@ PPMViewer::PPMViewer(int width, int height) {
 }
 
 PPMViewer::~PPMViewer() {
-  // SDL_Delay(this->delay);
   if (PtrChecks()) {
     SDL_DestroyTexture(pTex);
     SDL_DestroyRenderer(pRen);
@@ -55,7 +52,6 @@ void PPMViewer::DrawData(const std::vector<Pixel> &pixelData) {
     return;
   }
   SDL_UpdateTexture(pTex, NULL, pixelData.data(), width * 3);
-  SDL_SetRenderDrawColor(pRen, 0, 0, 0, 255);
   SDL_RenderClear(pRen);
   SDL_RenderCopy(pRen, pTex, NULL, NULL);
   SDL_RenderPresent(pRen);

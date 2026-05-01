@@ -18,6 +18,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
   Image image;
   std::string line;
   std::stringstream ss;
+
   auto GetNextValidLine = [&]() { // take all vars by reference
     while (std::getline(file, line)) {
       size_t commentPos = line.find("#");
@@ -42,7 +43,8 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
   ss >> image.ppmType;
 
   // getting width and height
-  int w = -1, h = -1;
+  int w = -1,
+      h = -1; // do this to move until a valid width/height value is found
   while (w == -1 || h == -1) {
     if (ss.eof()) {
       if (!GetNextValidLine())
@@ -84,9 +86,9 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
   image.maxVal = static_cast<uint16_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
-              << image.ppmType << "\nImage size: " << image.width << ","
+              << image.ppmType << "\nImage size: " << image.width << ", "
               << image.height << "\n"
-              << "Color maximum value: " << image.maxVal << "\n";
+              << "Color maximum value: " << maxValInt << "\n";
   }
 
   // parsing pixel data
