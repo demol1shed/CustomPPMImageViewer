@@ -1,8 +1,6 @@
 # Custom PPM Image Viewer
 This is a lightweight, hardware accelerated C++ application for parsing and viewing **.ppm (Portable Pixel Map)** images. This project manually parses **ASCII based** and **raw** .ppm files and renders them using the **SDL2** library.
 
-Also, this program is horribly inefficient and is simply me trying to challenge myself. Not only that the program itself is inefficient; the .ppm file format is also inefficient, quoted by netpbm.
-
 ## Features
 * **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
@@ -26,17 +24,6 @@ sudo pacman -S sdl2
 sudo dnf install SDL2-devel
 ```
 
-### Windows
-For Windows systems you will need to set up SDL2 with MinGW and Visual Studio. If using MinGW ensure that ```SDL2.dll``` is in your build directory.
-
-#### For MSYS2: 
-```bash
-sudo pacman -S mingw-w64-x86_64-SDL2
-```
-
-#### For Visual Studio:
-Download the development libraries from the [SDL GitHub](https://github.com/libsdl-org/SDL/releases) and link them manually. Any other version than SDL2 will result in the program not building.
-
 ### MacOS
 For macOS systems you might want to have homebrew installed for convenience.
 ```bash
@@ -54,27 +41,34 @@ If you are on an UNIX like system, then run ```chmod +x view```. Then you are re
 ### Basic Usage
 ```./view <path-to-your-image-file.ppm>```
 
-### Verbose Flag
-```./view <path-to-your-image-file.ppm> -v```
+### Help Flag
+For further information you can use the `-h` flag.
 
-This will display the parsed header values of the .ppm file, such as type, maxVal, width etc. It will also print every single pixel's RGB values as well. Which will severely slow down the process of viewing the image, so use at your own risk.
+```./view <path-to-your-image-file.ppm> [-h/--help]```
+
 
 ## Project Structure
 ```
-├── include/          # Custom header files
-│   ├── Pixel.h       # Packed struct for pixel data
-│   ├── Parser.h      # Declarations of file reading and text parsing
-│   └── PPMViewer.h   # Declarations of SDL2 window creation and rendering
-├── src/              # Implementation files
-│   ├── main.cpp      # Entry point & argument handling
-│   ├── Parser.cpp    # Implementation for file reading and parsing information
-│   └── PPMViewer.cpp # Implementation for window creation and rendering the image
-├── Makefile          # Build configuration
-└── README.md         # README file?
+├── include/               # Custom header files
+|   ├── BilinearLerper.h    # Declarations of the bilinear interpolation algorithm
+│   ├── Image.h             # Struct to hold image data
+│   ├── InverseMap.h        # Declarations of the inverse mapping algorithm
+│   ├── ViewState.h         # Struct to hold zooming and offsetting data
+│   ├── Pixel.h             # Packed struct for pixel data
+│   ├── Parser.h            # Declarations of file reading and text parsing
+│   └── PPMViewer.h         # Declarations of SDL2 window creation and rendering
+├── src/                   # Implementation files
+│   ├── main.cpp            # Entry point & argument handling
+│   ├── Parser.cpp          # Implementations for file reading and parsing information
+│   ├── BilinearLerper.cpp  # Implementations for the bilinear interpolation algorithm
+│   ├── InverseMap.cpp      # Implementations for the inverse mapping algorithm
+│   └── PPMViewer.cpp       # Implementations for window creation and rendering the image
+├── Makefile              # Build configuration file
+└── README.md             # README file?
 ```
 
 ## TODO:
-* Multithreaded ASCII parsing.
-* Interactive panning and zooming system.
-* Implement a better way of passing files to the program.
-* Support for different formats?  
+* Multithreaded parsing
+* Interactive panning and zooming system
+* Implementation of a better way of passing files to the program
+* Support for different formats
