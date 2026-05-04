@@ -50,13 +50,14 @@ void PrintHelp() {
   )";
 
   std::cout << red << asciiArt << reset << "\n\n";
-  std::cout << bold << "Usage: " << reset
-            << "./view [path_to_ppm_file] [options]\n"
-            << bold << "Options: " << reset << "\n"
-            << "  -h,         --help                  Show this help message\n"
-            << "  -v,         --verbose               Enable verbose output\n"
-            << "  -z <float>, --zoom <float>          Set the initial zoom "
-               "level (e.g., 2.0)\n";
+  std::cout
+      << bold << "Usage: " << reset << "./view [path_to_ppm_file] [options]\n"
+      << bold << "Options: " << reset << "\n"
+      << "  -h,         --help                  Show this help message\n"
+      << "  -v,         --verbose               Enable verbose output\n"
+      << "  -z <float>, --zoom <float>          Set the initial zoom "
+         "level (e.g., 2.0)\n"
+      << "  -t  <uint>, --threads <uint>        Set thread count (e.g., 32)\n";
 }
 
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
@@ -194,8 +195,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  Parser::RowsPerThread(threadCount, verboseFlag);
-
   if (zoomAmount != DEFAULTZOOM)
     zoomPreference = true;
 
@@ -209,7 +208,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (auto image = Parser::ParseFile(filePath, verboseFlag)) {
+  if (auto image = Parser::ParseFile(filePath, threadCount, verboseFlag)) {
     if (image.has_value()) {
       if (zoomPreference) {
         ProcessImage(image, dm, zoomAmount);

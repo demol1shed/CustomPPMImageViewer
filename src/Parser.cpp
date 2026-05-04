@@ -14,25 +14,41 @@ constexpr uint MAX_THREAD_COUNT = 64;
 constexpr uint MIN_THREAD_COUNT = 1;
 } // namespace
 
-uint Parser::RowsPerThread(uint threadCount, bool verbose) {
-  if (threadCount > MAX_THREAD_COUNT) {
-    std::cout << "Warning: Maximum usable thread count is " << MAX_THREAD_COUNT
-              << "." << "\n"
-              << "You've entered: " << threadCount << " threads.\n"
-              << "Defaulting to 64 threads..." << "\n";
-    threadCount = MAX_THREAD_COUNT;
-  } else if (threadCount <= MIN_THREAD_COUNT - 1) {
+void Parser::RowsPerThread(uint threadCount, int rows, bool verbose) {
+  if (threadCount < MIN_THREAD_COUNT) {
     std::cout << "Warning: Minimum usable thread count is " << MIN_THREAD_COUNT
               << "." << "\n"
               << "You've entered: " << threadCount << " threads.\n"
               << "Defaulting to 1 thread..." << "\n";
     threadCount = MIN_THREAD_COUNT;
+  } else if (threadCount > std::thread::hardware_concurrency()) {
+    std::cerr << "Warning: Avaliable thread count is: "
+              << std::thread::hardware_concurrency() << "\n";
+    std::cerr << "Defaulting to " << std::thread::hardware_concurrency()
+              << " threads..." << "\n";
+
+    threadCount = std::thread::hardware_concurrency();
+  } else if (threadCount > MAX_THREAD_COUNT) {
+    std::cout << "Warning: Maximum usable thread count is " << MAX_THREAD_COUNT
+              << "." << "\n"
+              << "You've entered: " << threadCount << " threads.\n"
+              << "Defaulting to 64 threads..." << "\n";
+    threadCount = MAX_THREAD_COUNT;
   }
-  return threadCount;
+  for (int i = 0; i < threadCount - 1; i++) {
+    int startRow = (i * rows) / threadCount;
+    int endRow = ((i + 1) * rows) / threadCount;
+    if (verbose) {
+      std::cout << "Thread ID: " << i << " rows: " << startRow << ", " << endRow
+                << "\n";
+      std::cout << "Thread ID: " << i
+                << " has row count of: " << endRow - startRow << "\n";
+    }
+  }
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
-                                       bool verbose) {
+                                       uint threadCount, bool verbose) {
   std::ifstream file(filePath, std::ios::binary);
   if (!file.is_open()) {
     std::cerr << "File at" << filePath << " could not be found or opened.\n";
@@ -115,6 +131,8 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
               << image.imageHeader.height << "\n"
               << "Color maximum value: " << maxValInt << "\n";
   }
+
+  RowsPerThread(MAX_THREAD_COUNT, image.imageHeader.width, verbose);
 
   // parsing pixel data
   size_t totalPixels = image.imageHeader.width * image.imageHeader.height;
