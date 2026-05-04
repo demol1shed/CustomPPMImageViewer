@@ -7,6 +7,30 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <thread>
+
+namespace {
+constexpr uint MAX_THREAD_COUNT = 64;
+constexpr uint MIN_THREAD_COUNT = 1;
+} // namespace
+
+uint Parser::RowsPerThread(uint threadCount, bool verbose) {
+  if (threadCount > MAX_THREAD_COUNT) {
+    std::cout << "Warning: Maximum usable thread count is " << MAX_THREAD_COUNT
+              << "." << "\n"
+              << "You've entered: " << threadCount << " threads.\n"
+              << "Defaulting to 64 threads..." << "\n";
+    threadCount = MAX_THREAD_COUNT;
+  } else if (threadCount <= MIN_THREAD_COUNT - 1) {
+    std::cout << "Warning: Minimum usable thread count is " << MIN_THREAD_COUNT
+              << "." << "\n"
+              << "You've entered: " << threadCount << " threads.\n"
+              << "Defaulting to 1 thread..." << "\n";
+    threadCount = MIN_THREAD_COUNT;
+  }
+  return threadCount;
+}
+
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
                                        bool verbose) {
   std::ifstream file(filePath, std::ios::binary);
@@ -40,7 +64,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     return std::nullopt;
   ss.clear();
   ss.str(line);
-  ss >> image.ppmType;
+  ss >> image.imageHeader.ppmType;
 
   // getting width and height
   int w = -1,
@@ -65,8 +89,8 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       ss >> h;
   }
 
-  image.width = w;
-  image.height = h;
+  image.imageHeader.width = w;
+  image.imageHeader.height = h;
 
   // getting maxVal
   int maxValInt = 0;
@@ -83,19 +107,20 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
               << "\n";
     return std::nullopt;
   }
-  image.maxVal = static_cast<uint16_t>(maxValInt);
+  image.imageHeader.maxVal = static_cast<uint16_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
-              << image.ppmType << "\nImage size: " << image.width << ", "
-              << image.height << "\n"
+              << image.imageHeader.ppmType
+              << "\nImage size: " << image.imageHeader.width << ", "
+              << image.imageHeader.height << "\n"
               << "Color maximum value: " << maxValInt << "\n";
   }
 
   // parsing pixel data
-  size_t totalPixels = image.width * image.height;
+  size_t totalPixels = image.imageHeader.width * image.imageHeader.height;
   image.pixelData.resize(totalPixels);
 
-  if (image.ppmType == "P6") {
+  if (image.imageHeader.ppmType == "P6") {
     // raw ppm
     file.read(reinterpret_cast<char *>(image.pixelData.data()),
               totalPixels * sizeof(Pixel));

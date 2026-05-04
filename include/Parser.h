@@ -5,6 +5,7 @@
 
 class Parser {
 public:
+  static uint RowsPerThread(uint threadCount, bool verbose = false);
   static std::optional<Image>
   ParseFile(const std::string &filePath,
             bool verbose = false); // returns nullopt if parsing fails

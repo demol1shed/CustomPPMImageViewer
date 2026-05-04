@@ -14,7 +14,8 @@
 
 constexpr float DEFAULTZOOM = 1.0f;
 constexpr int DEFAULTPADDING = 200;
-constexpr int DEFAULTARGCOUNT = 5;
+constexpr int DEFAULTARGCOUNT = 7;
+constexpr uint DEFAULTTHREADCOUNT = 1;
 
 void PrintHelp() {
   const std::string red = "\033[31m";
@@ -59,7 +60,7 @@ void PrintHelp() {
 }
 
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
-             std::string &filePath, float &zoomAmount) {
+             std::string &filePath, float &zoomAmount, uint &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
     return false;
@@ -92,6 +93,26 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
         std::cerr << "Error: Zoom requires a numeric value" << "\n";
         return false;
       }
+    } else if (arg == "-t" || arg == "--threads") {
+      if (i + 1 < argv.size()) {
+        std::string tVal = argv[i + 1];
+        try {
+          threadCount = std::stoi(tVal);
+        } catch (const std::invalid_argument &e) {
+          std::cerr << "Error: Invalid thread count value. " << "\n";
+          std::cerr << tVal << " is not a number" << "\n";
+          return false;
+        } catch (const std::out_of_range &e) {
+          std::cerr << "Error: Thread count too large" << "\n";
+          return false;
+        }
+        i++;
+      } else {
+        std::cerr
+            << "Error: Thread count requires a numeric value between 1 to 64"
+            << "\n";
+        return false;
+      }
     } else {
       filePath = arg;
     }
@@ -106,16 +127,17 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
   return true;
 }
 
+// after parsing
 void ProcessImage(std::optional<Image> &image, const int padding,
                   const SDL_DisplayMode &dm) {
   int maxW = std::max(1, dm.w - padding);
   int maxH = std::max(1, dm.h - padding);
 
-  float scaleX = (float)maxW / image->width;
-  float scaleY = (float)maxH / image->height;
+  float scaleX = (float)maxW / image->imageHeader.width;
+  float scaleY = (float)maxH / image->imageHeader.height;
   float idealZoom = std::min({scaleX, scaleY, 1.0f});
-  int winHeight = (int)(image->height * idealZoom);
-  int winWidth = (int)(image->width * idealZoom);
+  int winHeight = (int)(image->imageHeader.height * idealZoom);
+  int winWidth = (int)(image->imageHeader.width * idealZoom);
 
   ViewState vState;
   vState.zoom = idealZoom;
@@ -123,8 +145,8 @@ void ProcessImage(std::optional<Image> &image, const int padding,
   vState.offsetY = 0.0f;
 
   Image sourceImage;
-  sourceImage.width = image->width;
-  sourceImage.height = image->height;
+  sourceImage.imageHeader.width = image->imageHeader.width;
+  sourceImage.imageHeader.height = image->imageHeader.height;
   sourceImage.pixelData = image->pixelData;
 
   std::vector<Pixel> processedBuffer(winWidth * winHeight);
@@ -137,8 +159,8 @@ void ProcessImage(std::optional<Image> &image, const int padding,
 
 void ProcessImage(std::optional<Image> &image, const SDL_DisplayMode &dm,
                   float zoom) {
-  int winHeight = (int)(image->height * zoom);
-  int winWidth = (int)(image->width * zoom);
+  int winHeight = (int)(image->imageHeader.height * zoom);
+  int winWidth = (int)(image->imageHeader.width * zoom);
 
   ViewState vState;
   vState.zoom = zoom;
@@ -146,8 +168,8 @@ void ProcessImage(std::optional<Image> &image, const SDL_DisplayMode &dm,
   vState.offsetY = 0.0f;
 
   Image sourceImage;
-  sourceImage.width = image->width;
-  sourceImage.height = image->height;
+  sourceImage.imageHeader.width = image->imageHeader.width;
+  sourceImage.imageHeader.height = image->imageHeader.height;
   sourceImage.pixelData = image->pixelData;
 
   std::vector<Pixel> processedBuffer(winWidth * winHeight);
@@ -164,12 +186,15 @@ int main(int argc, char *argv[]) {
 
   float zoomAmount = DEFAULTZOOM;
   bool zoomPreference = false;
+  uint threadCount = DEFAULTTHREADCOUNT;
 
   std::vector<std::string> args(argv, argc + argv);
 
-  if (!GetArgs(args, verboseFlag, filePath, zoomAmount)) {
+  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, threadCount)) {
     return 1;
   }
+
+  Parser::RowsPerThread(threadCount, verboseFlag);
 
   if (zoomAmount != DEFAULTZOOM)
     zoomPreference = true;
