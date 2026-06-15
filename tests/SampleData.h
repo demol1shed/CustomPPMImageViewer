@@ -31,10 +31,10 @@ inline Pixel expectedPixel(int i) {
 // exercise sampling/mapping without touching the filesystem.
 inline Image makeImage() {
   Image img;
-  img.width = kWidth;
-  img.height = kHeight;
-  img.ppmType = "P3";
-  img.maxVal = 255;
+  img.imageHeader.width = kWidth;
+  img.imageHeader.height = kHeight;
+  img.imageHeader.ppmType = "P3";
+  img.imageHeader.maxVal = 255;
   img.pixelData.resize(kPixelCount);
   for (int i = 0; i < kPixelCount; ++i) {
     img.pixelData[i] = expectedPixel(i);

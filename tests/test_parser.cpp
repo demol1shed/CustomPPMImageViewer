@@ -8,19 +8,20 @@
 #include <string>
 
 TEST(Parser, ParsesAsciiP3Header) {
-  auto img = Parser::ParseFile(sample::asciiPath(), /*verbose=*/false);
+  auto img = Parser::ParseFile(sample::asciiPath(), /*threadCount=*/1,
+                               /*verbose=*/false);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
-  CHECK_EQ(std::string("P3"), img->ppmType);
-  CHECK_EQ(sample::kWidth, img->width);
-  CHECK_EQ(sample::kHeight, img->height);
-  CHECK_EQ(255, static_cast<int>(img->maxVal));
+  CHECK_EQ(std::string("P3"), img->imageHeader.ppmType);
+  CHECK_EQ(sample::kWidth, img->imageHeader.width);
+  CHECK_EQ(sample::kHeight, img->imageHeader.height);
+  CHECK_EQ(255, static_cast<int>(img->imageHeader.maxVal));
   CHECK_EQ(sample::kPixelCount, static_cast<int>(img->pixelData.size()));
 }
 
 TEST(Parser, ParsesAsciiP3Pixels) {
-  auto img = Parser::ParseFile(sample::asciiPath(), false);
+  auto img = Parser::ParseFile(sample::asciiPath(), /*threadCount=*/1, false);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
@@ -31,18 +32,18 @@ TEST(Parser, ParsesAsciiP3Pixels) {
 }
 
 TEST(Parser, ParsesBinaryP6Header) {
-  auto img = Parser::ParseFile(sample::binaryPath(), false);
+  auto img = Parser::ParseFile(sample::binaryPath(), /*threadCount=*/1, false);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
-  CHECK_EQ(std::string("P6"), img->ppmType);
-  CHECK_EQ(sample::kWidth, img->width);
-  CHECK_EQ(sample::kHeight, img->height);
+  CHECK_EQ(std::string("P6"), img->imageHeader.ppmType);
+  CHECK_EQ(sample::kWidth, img->imageHeader.width);
+  CHECK_EQ(sample::kHeight, img->imageHeader.height);
   CHECK_EQ(sample::kPixelCount, static_cast<int>(img->pixelData.size()));
 }
 
 TEST(Parser, ParsesBinaryP6Pixels) {
-  auto img = Parser::ParseFile(sample::binaryPath(), false);
+  auto img = Parser::ParseFile(sample::binaryPath(), /*threadCount=*/1, false);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
@@ -55,8 +56,8 @@ TEST(Parser, ParsesBinaryP6Pixels) {
 // The two encodings describe the same image, so their decoded buffers must be
 // byte-for-byte identical.
 TEST(Parser, AsciiAndBinaryDecodeToSamePixels) {
-  auto ascii = Parser::ParseFile(sample::asciiPath(), false);
-  auto binary = Parser::ParseFile(sample::binaryPath(), false);
+  auto ascii = Parser::ParseFile(sample::asciiPath(), /*threadCount=*/1, false);
+  auto binary = Parser::ParseFile(sample::binaryPath(), /*threadCount=*/1, false);
   CHECK_TRUE(ascii.has_value());
   CHECK_TRUE(binary.has_value());
   if (!ascii || !binary)
@@ -72,6 +73,7 @@ TEST(Parser, AsciiAndBinaryDecodeToSamePixels) {
 }
 
 TEST(Parser, MissingFileReturnsNullopt) {
-  auto img = Parser::ParseFile("tests/samples/__does_not_exist__.ppm", false);
+  auto img = Parser::ParseFile("tests/samples/__does_not_exist__.ppm",
+                               /*threadCount=*/1, false);
   CHECK_FALSE(img.has_value());
 }
