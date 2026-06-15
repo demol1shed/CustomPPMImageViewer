@@ -1,5 +1,6 @@
 #include "Pixel.h"
 #include <Parser.h>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -16,6 +17,13 @@ constexpr uint MIN_THREAD_COUNT = 1;
 
 // Below this row count the threading overhead outweighs the gain; read serially.
 constexpr int MIN_ROWS_FOR_THREADING = 2;
+
+// The C-locale whitespace set that the old `operator>>` skipped; kept explicit
+// so ASCII (P3) parsing stays locale-independent (matching std::from_chars).
+inline bool IsWhitespace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' ||
+         c == '\f';
+}
 
 // Clamp a user-requested thread count to a sane, useful value: at least 1, no
 // more than the detected core count, never above MAX_THREAD_COUNT, and never
@@ -267,18 +275,56 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       }
     }
   } else {
-    // ascii mode
-    int r, g, b;
-    for (size_t i = 0; i < totalPixels; i++) {
-      file >> r >> g >> b;
-      image.pixelData[i] = {static_cast<uint8_t>(r), static_cast<uint8_t>(g),
-                            static_cast<uint8_t>(b)};
+    // ASCII (P3): read the whole value region once, then parse the integers
+    // with std::from_chars -- far faster and allocation-free vs per-value
+    // operator>> extraction. Write straight into the packed pixel bytes:
+    // pixelData is contiguous 3-byte Pixels, so value index v -> flat[v]
+    // (r,g,b,r,g,b,...), channel grouping is automatic.
+    const std::streamoff dataStart = file.tellg();
+    file.seekg(0, std::ios::end);
+    const std::streamoff endPos = file.tellg();
+    file.seekg(dataStart, std::ios::beg);
+    if (dataStart < 0 || endPos < dataStart) {
+      std::cerr << "Error: could not size P3 pixel data.\n";
+      return std::nullopt;
+    }
+    const size_t regionBytes = static_cast<size_t>(endPos - dataStart);
+    std::vector<char> buf(regionBytes);
+    file.read(buf.data(), static_cast<std::streamsize>(regionBytes));
+
+    std::uint8_t *flat =
+        reinterpret_cast<std::uint8_t *>(image.pixelData.data());
+    const size_t needed = totalPixels * 3;
+    const char *base = buf.data();
+    const size_t n = buf.size();
+    size_t p = 0;
+    size_t v = 0;
+    while (p < n && v < needed) {
+      while (p < n && IsWhitespace(base[p]))
+        ++p;
+      if (p >= n)
+        break;
+      const char *tokBegin = base + p;
+      while (p < n && !IsWhitespace(base[p]))
+        ++p;
+      int value = 0;
+      auto res = std::from_chars(tokBegin, base + p, value);
+      if (res.ec != std::errc{} || res.ptr != base + p) {
+        std::cerr << "Error: malformed P3 pixel value.\n";
+        return std::nullopt;
+      }
+      flat[v++] = static_cast<std::uint8_t>(value);
+    }
+    // Strict: exactly width*height*3 values, with nothing but whitespace left.
+    while (p < n && IsWhitespace(base[p]))
+      ++p;
+    if (v != needed || p != n) {
+      std::cerr << "Error: P3 value count does not match header.\n";
+      return std::nullopt;
     }
 
-    if (verbose) {
-
+    if (verbose)
       std::cout << "ASCII P3 data read.\n";
-    }
   }
 
   return image;
