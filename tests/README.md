@@ -26,6 +26,7 @@ tests assert on exact pixel values instead.
 ```bash
 make test     # build + run the unit tests (exit code 0 = all passed)
 make smoke    # run the real ./view binary headlessly on the samples
+make bench    # time Parser::ParseFile across thread counts (dev tool, not a gate)
 make clean    # remove build artifacts incl. run_tests
 ```
 
@@ -39,6 +40,17 @@ core still decodes the fixtures correctly.
 video driver (`SDL_VIDEODRIVER=dummy`), so it needs no real display. It fails
 if the binary crashes (segfault/abort) or if verbose output does not report the
 expected parsed dimensions.
+
+`make bench` (source in `bench/bench_parser.cpp`) times `Parser::ParseFile` for a
+P6 and a P3 file at thread counts {1,2,4,8,16}, reporting min/median ms and
+speedup vs one thread. It is a **warm-cache developer tool, not a CI gate** —
+numbers swing with CPU governor/turbo/load. Read it with two facts in mind: P6
+decode is I/O/memcpy-bound, so its parallel gains are small and can regress at
+high thread counts on small files; P3 decode is CPU-bound, and its biggest lever
+is the single-thread parsing strategy (`from_chars` vs iostream) — read that win
+separately from the parallel one. It defaults to `test.ppm`/`testascii.ppm`
+(accepts override paths as argv) and synthesizes a deterministic large fixture in
+`/tmp` if none is present, so it runs on a fresh clone.
 
 ## The fixture
 
