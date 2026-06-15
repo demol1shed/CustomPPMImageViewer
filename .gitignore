@@ -16,8 +16,9 @@ compile_commands.json
 Thumbs.db
 *.ppm
 
-# Test build artifact
+# Build artifacts
 run_tests
+bench_parser
 
 # Keep committed test fixtures even though *.ppm is ignored above
 !tests/samples/4x4.ppm
