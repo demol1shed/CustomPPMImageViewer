@@ -51,3 +51,64 @@ You must thoroughly understand these parts of the codebase before making changes
 4. **Always check for memory leaks** when modifying the SDL lifecycle. Use RAII principles where appropriate to guarantee resource cleanup.
 5. **No external libraries**: If a math or parsing utility is needed, implement it manually.
 6. When writing code, specifically **document any complex pointer arithmetic or thread-synchronization logic** directly in the source comments.
+
+## 7. Git & Version Control Workflow
+This repository follows a modern, conventional Git workflow. **Every commit, branch, and pull request MUST adhere to the rules below.** The existing history already follows this pattern (`feat: add argument parsing for thread count`, `chore: ...`, branches like `feature/multithreadedParsing`, PR `#6`) — stay consistent with it. All commit messages and PR descriptions are written in **English**, matching the existing history.
+
+### 7.1 Commit Messages (Conventional Commits)
+Every commit message MUST begin with a type prefix followed by a concise, imperative summary:
+
+```
+<type>(optional-scope): <short summary in the imperative mood>
+```
+
+**Allowed types:**
+- **feat:** — a new feature or user-facing capability (e.g., `feat: add argument parsing for thread count`)
+- **fix:** — a bug fix (e.g., `fix: parse maxVal before pixel data`)
+- **chore:** — tooling, build, or housekeeping with no production-code behavior change (e.g., `chore: add CLAUDE.md for AI-assisted development`)
+- **refactor:** — code restructuring that does not change observable behavior
+- **perf:** — a performance improvement (highly relevant to the multithreading roadmap)
+- **docs:** — documentation only (README, code comments, this file)
+- **test:** — adding or fixing tests
+- **build:** — Makefile, compiler, or dependency changes
+- **style:** — formatting only (whitespace, clang-format), no logic change
+
+**Rules:**
+- Summary line ≤ ~72 chars, **imperative mood** ("add", not "added"/"adds"), no trailing period.
+- Optional scope in parentheses to localize the change: `feat(parser): ...`, `fix(viewer): ...`.
+- **A descriptive commit body is mandatory** for anything beyond a trivial one-liner. Leave a blank line after the summary, then explain **what** changed and **why** (not the line-by-line "how"). Reference the relevant roadmap item or issue where applicable.
+
+**Example:**
+```
+feat(parser): parallelize P6 pixel reads across a thread pool
+
+Split the binary pixel buffer into N row-ranges (one worker per range) so
+large P6 files load without blocking. Falls back to a single thread when
+hardware_concurrency() reports < 2. Addresses roadmap item #1
+(Multithreaded Parsing).
+```
+
+### 7.2 Branch Naming
+**Never commit directly to `master`** (the protected default branch and the base for all PRs). Create a topic branch named `<type>/<short-description>`, where `<type>` reuses the commit-type vocabulary:
+
+- `feature/<name>` — new features (e.g., `feature/multithreadedParsing`)
+- `fix/<name>` — bug fixes (e.g., `fix/maxValOrder`)
+- `chore/<name>` — housekeeping (e.g., `chore/refactoring-codebase`)
+- `refactor/<name>`, `perf/<name>`, `docs/<name>` — as appropriate
+
+Keep the description short and meaningful (a few words). Match the casing of nearby branches.
+
+### 7.3 Pull Requests
+All changes reach `master` through a Pull Request — **never a direct push**. Open and manage PRs with the `gh` CLI (`gh pr create`, `gh pr view`).
+
+- **Title**: uses the same Conventional Commit format as a commit (`feat: ...`, `fix: ...`) and summarizes the whole PR.
+- **A PR description is mandatory.** Every PR body MUST explain:
+  1. **What** the PR does — a short summary of the change.
+  2. **Why** it is needed — motivation, the roadmap item it advances, or the bug it fixes.
+  3. **How** it was verified — build passes (`make`), and which `.ppm` files / flags it was tested with.
+  Prefer a brief **Summary** section followed by a **Test plan** checklist.
+- Keep each PR focused on a single concern; small, reviewable diffs are strongly preferred.
+- **Merge strategy**: **squash-and-merge** into `master` (matches PR `#6`, which landed as a single `(#6)` commit), keeping history linear. The resulting squash commit message must itself follow the Conventional Commit rules in §7.1.
+
+### 7.4 Releases & Tags
+Tag meaningful releases with **SemVer-style** tags (`vMAJOR.MINOR.PATCH`), consistent with existing tags (e.g., `v0.3.18`). Bump MAJOR for breaking changes, MINOR for new features, PATCH for fixes.
