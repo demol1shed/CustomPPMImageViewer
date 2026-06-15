@@ -42,6 +42,8 @@ You must thoroughly understand these parts of the codebase before making changes
 - **Build Command**: `make`
 - **Run Basic**: `./view <path-to.ppm>`
 - **Run with Flags**: `./view <path-to.ppm> -v -z 0.5`
+- **Run Tests**: `make test` (builds and runs the deterministic unit tests in `tests/`; non-zero exit code on any failure). Run this after changing parsing or interpolation logic to guard against regressions.
+- **Smoke Test**: `make smoke` (runs the real `./view` binary headlessly on `tests/samples/` via the SDL dummy driver to catch crashes/segfaults end-to-end).
 - **Clean**: `make clean`
 
 ## 6. Strict AI Rules for this Repository
