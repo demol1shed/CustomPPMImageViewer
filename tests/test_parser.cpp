@@ -99,3 +99,25 @@ TEST(Parser, ParallelP6MatchesSerial) {
                   serial->pixelData[i].g, serial->pixelData[i].b);
   }
 }
+
+// Same guarantee for the ASCII (P3) byte-range parallel decode: multithreaded
+// must be byte-identical to serial. The 4x4 P3 sample (with comments + varied
+// whitespace) exercises the token-boundary resync on real parsing; a broader
+// sweep on a larger fixture lands in a follow-up step.
+TEST(Parser, ParallelP3MatchesSerial) {
+  auto serial = Parser::ParseFile(sample::asciiPath(), /*threadCount=*/1, false);
+  CHECK_TRUE(serial.has_value());
+  if (!serial)
+    return;
+  for (uint threads : {2u, 3u, 4u, 8u}) {
+    auto parallel = Parser::ParseFile(sample::asciiPath(), threads, false);
+    CHECK_TRUE(parallel.has_value());
+    if (!parallel)
+      continue;
+    CHECK_EQ(static_cast<int>(serial->pixelData.size()),
+             static_cast<int>(parallel->pixelData.size()));
+    for (size_t i = 0; i < serial->pixelData.size(); ++i)
+      CHECK_PIXEL(parallel->pixelData[i], serial->pixelData[i].r,
+                  serial->pixelData[i].g, serial->pixelData[i].b);
+  }
+}

@@ -1,5 +1,6 @@
 #include "Pixel.h"
 #include <Parser.h>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -16,6 +17,89 @@ constexpr uint MIN_THREAD_COUNT = 1;
 
 // Below this row count the threading overhead outweighs the gain; read serially.
 constexpr int MIN_ROWS_FOR_THREADING = 2;
+
+// The C-locale whitespace set that the old `operator>>` skipped; kept explicit
+// so ASCII (P3) parsing stays locale-independent (matching std::from_chars).
+inline bool IsWhitespace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' ||
+         c == '\f';
+}
+
+// Sentinel returned by WalkP3Tokens (parse mode) on a non-numeric token.
+constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
+
+// Single source of the P3 token walk, shared by counting (pass 1) and parsing
+// (pass 2) so the two passes can never disagree on which tokens a window owns.
+//
+// Walks the whitespace-separated tokens of base[0,N) that are OWNED by the byte
+// window [cs,ce) -- a token (maximal non-whitespace run) belongs to the window
+// holding its FIRST byte. If `out` is null, just counts. Otherwise from_chars
+// each owned token and writes the byte to out[outStart + k] for the k-th owned
+// token. Returns the owned-token count, or kWalkError on a non-numeric /
+// out-of-range token (parse mode only).
+std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
+                         std::size_t ce, std::uint8_t *out,
+                         std::size_t outStart) {
+  std::size_t p = cs;
+  // If the window starts mid-token, that token's first byte is in an earlier
+  // window (which owns and finishes it) -> skip to the next token boundary.
+  if (p > 0 && p < N && !IsWhitespace(base[p - 1])) {
+    while (p < N && !IsWhitespace(base[p]))
+      ++p;
+  }
+
+  std::size_t count = 0;
+  while (true) {
+    while (p < N && IsWhitespace(base[p]))
+      ++p;
+    if (p >= N || p >= ce) // next token-start belongs to a later window
+      break;
+    const char *tokBegin = base + p;
+    while (p < N && !IsWhitespace(base[p])) // advance past token end (may pass ce)
+      ++p;
+    if (out) {
+      int value = 0;
+      const std::from_chars_result res =
+          std::from_chars(tokBegin, base + p, value);
+      if (res.ec != std::errc{} || res.ptr != base + p)
+        return kWalkError;
+      out[outStart + count] = static_cast<std::uint8_t>(value);
+    }
+    ++count;
+  }
+  return count;
+}
+
+// P3 pass-1 worker: count the tokens owned by [cs,ce) into *outCount. Operates
+// on the shared read-only buffer; never lets an exception cross the thread.
+void CountP3Range(const char *base, std::size_t N, std::size_t cs,
+                  std::size_t ce, std::size_t *outCount, std::uint8_t *okFlag) {
+  *okFlag = 0;
+  try {
+    *outCount = WalkP3Tokens(base, N, cs, ce, nullptr, 0);
+    *okFlag = 1;
+  } catch (...) {
+  }
+}
+
+// P3 pass-2 worker: parse the tokens owned by [cs,ce) and write them into the
+// disjoint slice flat[startValueIndex ..). Fails (okFlag stays 0) on a
+// non-numeric token, or if it did not write exactly expectedCount values (a
+// guard against any pass-1/pass-2 walk divergence). No mutex: the buffer is
+// read-only and each worker writes a disjoint slice.
+void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
+                  std::size_t ce, std::size_t startValueIndex,
+                  std::size_t expectedCount, std::uint8_t *flat,
+                  std::uint8_t *okFlag) {
+  *okFlag = 0;
+  try {
+    const std::size_t got = WalkP3Tokens(base, N, cs, ce, flat, startValueIndex);
+    if (got == kWalkError || got != expectedCount)
+      return;
+    *okFlag = 1;
+  } catch (...) {
+  }
+}
 
 // Clamp a user-requested thread count to a sane, useful value: at least 1, no
 // more than the detected core count, never above MAX_THREAD_COUNT, and never
@@ -104,6 +188,29 @@ std::vector<RowRange> Parser::ComputeRowRanges(int height, int threadCount) {
     ranges.push_back({startRow, endRow});
   }
   return ranges;
+}
+
+std::vector<ByteRange> Parser::ComputeByteRanges(std::size_t totalBytes,
+                                                 int threadCount) {
+  std::vector<ByteRange> ranges;
+  if (threadCount < 1)
+    threadCount = 1;
+  ranges.reserve(static_cast<std::size_t>(threadCount));
+  // Balanced byte split; cast i to size_t before i*totalBytes so the product
+  // is computed in size_t (totalBytes can be large for a big P3 file).
+  for (int i = 0; i < threadCount; ++i) {
+    std::size_t start = (static_cast<std::size_t>(i) * totalBytes) / threadCount;
+    std::size_t end =
+        (static_cast<std::size_t>(i + 1) * totalBytes) / threadCount;
+    ranges.push_back({start, end});
+  }
+  return ranges;
+}
+
+std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
+                                       std::size_t chunkStart,
+                                       std::size_t chunkEnd) {
+  return WalkP3Tokens(base, totalBytes, chunkStart, chunkEnd, nullptr, 0);
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
@@ -267,17 +374,138 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       }
     }
   } else {
-    // ascii mode
-    int r, g, b;
-    for (size_t i = 0; i < totalPixels; i++) {
-      file >> r >> g >> b;
-      image.pixelData[i] = {static_cast<uint8_t>(r), static_cast<uint8_t>(g),
-                            static_cast<uint8_t>(b)};
+    // ASCII (P3): read the whole value region once, then parse the integers
+    // with std::from_chars -- far faster and allocation-free vs per-value
+    // operator>> extraction. Write straight into the packed pixel bytes:
+    // pixelData is contiguous 3-byte Pixels, so value index v -> flat[v]
+    // (r,g,b,r,g,b,...), channel grouping is automatic.
+    const std::streamoff dataStart = file.tellg();
+    file.seekg(0, std::ios::end);
+    const std::streamoff endPos = file.tellg();
+    file.seekg(dataStart, std::ios::beg);
+    if (dataStart < 0 || endPos < dataStart) {
+      std::cerr << "Error: could not size P3 pixel data.\n";
+      return std::nullopt;
     }
+    const size_t regionBytes = static_cast<size_t>(endPos - dataStart);
+    std::vector<char> buf(regionBytes);
+    file.read(buf.data(), static_cast<std::streamsize>(regionBytes));
 
-    if (verbose) {
+    std::uint8_t *flat =
+        reinterpret_cast<std::uint8_t *>(image.pixelData.data());
+    const size_t needed = totalPixels * 3;
+    const char *base = buf.data();
+    const size_t n = buf.size();
 
-      std::cout << "ASCII P3 data read.\n";
+    const int height = image.imageHeader.height;
+    const unsigned effectiveThreads = EffectiveThreadCount(threadCount, height);
+    const unsigned hw = std::thread::hardware_concurrency();
+    if (verbose && effectiveThreads != threadCount) {
+      std::cout << "Note: requested " << threadCount << " thread(s), using "
+                << effectiveThreads << " (clamped to cores/rows/limits).\n";
+    }
+    const bool parallel = effectiveThreads >= 2 && hw >= 2 &&
+                          height >= MIN_ROWS_FOR_THREADING;
+
+    if (parallel) {
+      // Split the value region into byte windows; workers share the read-only
+      // buf and write disjoint slices of flat, so no mutex is needed.
+      std::vector<ByteRange> ranges = ComputeByteRanges(n, effectiveThreads);
+
+      // Pass 1: count the tokens each window owns.
+      std::vector<std::size_t> counts(ranges.size(), 0);
+      std::vector<std::uint8_t> ok1(ranges.size(), 0);
+      {
+        std::vector<std::thread> workers;
+        workers.reserve(ranges.size());
+        for (size_t i = 0; i < ranges.size(); ++i) {
+          if (ranges[i].start >= ranges[i].end) {
+            ok1[i] = 1; // empty window
+            continue;
+          }
+          workers.emplace_back(CountP3Range, base, n, ranges[i].start,
+                               ranges[i].end, &counts[i], &ok1[i]);
+        }
+        for (std::thread &worker : workers)
+          worker.join();
+      }
+      for (std::uint8_t flag : ok1) {
+        if (!flag) {
+          std::cerr << "Error: P3 count pass failed.\n";
+          return std::nullopt;
+        }
+      }
+
+      // Exclusive prefix sum -> each window's first value index in flat.
+      std::vector<std::size_t> starts(ranges.size(), 0);
+      std::size_t total = 0;
+      for (size_t i = 0; i < ranges.size(); ++i) {
+        starts[i] = total;
+        total += counts[i];
+      }
+      if (total != needed) {
+        std::cerr << "Error: P3 value count does not match header.\n";
+        return std::nullopt;
+      }
+
+      // Pass 2: parse each window into its disjoint slice of flat.
+      std::vector<std::uint8_t> ok2(ranges.size(), 0);
+      {
+        std::vector<std::thread> workers;
+        workers.reserve(ranges.size());
+        for (size_t i = 0; i < ranges.size(); ++i) {
+          if (counts[i] == 0) {
+            ok2[i] = 1; // nothing to write
+            continue;
+          }
+          workers.emplace_back(ParseP3Range, base, n, ranges[i].start,
+                               ranges[i].end, starts[i], counts[i], flat,
+                               &ok2[i]);
+        }
+        for (std::thread &worker : workers)
+          worker.join();
+      }
+      for (std::uint8_t flag : ok2) {
+        if (!flag) {
+          std::cerr << "Error: malformed P3 pixel value.\n";
+          return std::nullopt;
+        }
+      }
+
+      if (verbose)
+        std::cout << "ASCII P3 data read with " << effectiveThreads
+                  << " threads.\n";
+    } else {
+      // Serial fallback: one walk over the whole region (stop at `needed`, then
+      // require only trailing whitespace -- strict count check).
+      size_t p = 0;
+      size_t v = 0;
+      while (p < n && v < needed) {
+        while (p < n && IsWhitespace(base[p]))
+          ++p;
+        if (p >= n)
+          break;
+        const char *tokBegin = base + p;
+        while (p < n && !IsWhitespace(base[p]))
+          ++p;
+        int value = 0;
+        const std::from_chars_result res =
+            std::from_chars(tokBegin, base + p, value);
+        if (res.ec != std::errc{} || res.ptr != base + p) {
+          std::cerr << "Error: malformed P3 pixel value.\n";
+          return std::nullopt;
+        }
+        flat[v++] = static_cast<std::uint8_t>(value);
+      }
+      while (p < n && IsWhitespace(base[p]))
+        ++p;
+      if (v != needed || p != n) {
+        std::cerr << "Error: P3 value count does not match header.\n";
+        return std::nullopt;
+      }
+
+      if (verbose)
+        std::cout << "ASCII P3 data read (serial).\n";
     }
   }
 
