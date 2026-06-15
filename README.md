@@ -5,6 +5,7 @@ This is a lightweight, hardware accelerated C++ application for parsing and view
 * **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
 * **Smart Windowing:** Automatically resizes the window and the image according to the size of the image.
+* **Multithreaded Loading:** Optionally reads raw (P6) pixel data across several threads to speed up loading large images.
 
 ## Dependencies
 To build and run this project, all that you'll need is a C++ compiler and the **SDL2 Development Library**.
@@ -46,6 +47,11 @@ For further information you can use the `-h` flag.
 
 ```./view <path-to-your-image-file.ppm> [-h/--help]```
 
+### Multithreaded Loading
+For raw (P6) images you can spread the pixel reading across multiple threads with the `-t` flag. The count is clamped to the available cores and the number of image rows.
+
+```./view <path-to-your-image-file.ppm> [-t/--threads <count>]```
+
 
 ## Project Structure
 ```
@@ -68,7 +74,6 @@ For further information you can use the `-h` flag.
 ```
 
 ## TODO:
-* Multithreaded parsing
 * Interactive panning and zooming system
 * Implementation of a better way of passing files to the program
 * Support for different formats
