@@ -60,10 +60,10 @@ TEST(InverseMap, ZoomTwoUpscalesThroughBilinear) {
 // screen must come back black rather than reading out of bounds.
 TEST(InverseMap, DegenerateImageRendersBlack) {
   Image src;
-  src.width = 2;
-  src.height = 2;
-  src.ppmType = "P3";
-  src.maxVal = 255;
+  src.imageHeader.width = 2;
+  src.imageHeader.height = 2;
+  src.imageHeader.ppmType = "P3";
+  src.imageHeader.maxVal = 255;
   src.pixelData = {{10, 20, 30}, {40, 50, 60}, {70, 80, 90}, {100, 110, 120}};
 
   ViewState vs;

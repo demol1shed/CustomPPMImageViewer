@@ -12,8 +12,9 @@ Pixel BilinearLerper::Lerp(Pixel a, Pixel b, float d) {
   return result;
 }
 
-int BilinearLerper::GiveFlattenedIndexOf(int d, int i, int j) {
-  return (i * d) + j;
+int BilinearLerper::GiveFlattenedIndexOf(int w, int i, int j) {
+  // w = row width (column count); i = row (y), j = column (x).
+  return (i * w) + j;
 }
 
 Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
@@ -24,14 +25,14 @@ Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
   float deltaY = v - y;
 
   Pixel topLeft = source->pixelData[GiveFlattenedIndexOf(
-      source->width, y,
+      source->imageHeader.width, y,
       x)]; // i represents the y coordinate, j represents the x coordinate
-  Pixel topRight =
-      source->pixelData[GiveFlattenedIndexOf(source->width, y, x + 1)];
-  Pixel bottomLeft =
-      source->pixelData[GiveFlattenedIndexOf(source->width, y + 1, x)];
-  Pixel bottomRight =
-      source->pixelData[GiveFlattenedIndexOf(source->width, y + 1, x + 1)];
+  Pixel topRight = source->pixelData[GiveFlattenedIndexOf(
+      source->imageHeader.width, y, x + 1)];
+  Pixel bottomLeft = source->pixelData[GiveFlattenedIndexOf(
+      source->imageHeader.width, y + 1, x)];
+  Pixel bottomRight = source->pixelData[GiveFlattenedIndexOf(
+      source->imageHeader.width, y + 1, x + 1)];
 
   // formula: delta * (val2 - val1) + val1
   Pixel topColor = Lerp(topLeft, topRight, deltaX);

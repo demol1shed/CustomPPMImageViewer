@@ -14,7 +14,8 @@
 
 constexpr float DEFAULTZOOM = 1.0f;
 constexpr int DEFAULTPADDING = 200;
-constexpr int DEFAULTARGCOUNT = 5;
+constexpr int DEFAULTARGCOUNT = 7;
+constexpr uint DEFAULTTHREADCOUNT = 1;
 
 void PrintHelp() {
   const std::string red = "\033[31m";
@@ -49,23 +50,24 @@ void PrintHelp() {
   )";
 
   std::cout << red << asciiArt << reset << "\n\n";
-  std::cout << bold << "Usage: " << reset
-            << "./view [path_to_ppm_file] [options]\n"
-            << bold << "Options: " << reset << "\n"
-            << "  -h,         --help                  Show this help message\n"
-            << "  -v,         --verbose               Enable verbose output\n"
-            << "  -z <float>, --zoom <float>          Set the initial zoom "
-               "level (e.g., 2.0)\n";
+  std::cout
+      << bold << "Usage: " << reset << "./view [path_to_ppm_file] [options]\n"
+      << bold << "Options: " << reset << "\n"
+      << "  -h,         --help                  Show this help message\n"
+      << "  -v,         --verbose               Enable verbose output\n"
+      << "  -z <float>, --zoom <float>          Set the initial zoom "
+         "level (e.g., 2.0)\n"
+      << "  -t  <uint>, --threads <uint>        Set thread count (e.g., 32)\n";
 }
 
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
-             std::string &filePath, float &zoomAmount) {
+             std::string &filePath, float &zoomAmount, uint &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
     return false;
   }
 
-  for (int i = 1; i < argv.size(); i++) {
+  for (size_t i = 1; i < argv.size(); i++) {
     std::string arg = argv[i];
 
     if (arg == "-v" || arg == "--verbose") {
@@ -92,6 +94,26 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
         std::cerr << "Error: Zoom requires a numeric value" << "\n";
         return false;
       }
+    } else if (arg == "-t" || arg == "--threads") {
+      if (i + 1 < argv.size()) {
+        std::string tVal = argv[i + 1];
+        try {
+          threadCount = std::stoi(tVal);
+        } catch (const std::invalid_argument &e) {
+          std::cerr << "Error: Invalid thread count value. " << "\n";
+          std::cerr << tVal << " is not a number" << "\n";
+          return false;
+        } catch (const std::out_of_range &e) {
+          std::cerr << "Error: Thread count too large" << "\n";
+          return false;
+        }
+        i++;
+      } else {
+        std::cerr
+            << "Error: Thread count requires a numeric value between 1 to 64"
+            << "\n";
+        return false;
+      }
     } else {
       filePath = arg;
     }
@@ -106,53 +128,32 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
   return true;
 }
 
-void ProcessImage(std::optional<Image> &image, const int padding,
-                  const SDL_DisplayMode &dm) {
+// Computes the zoom that fits the image inside the desktop work area (display
+// size minus padding), never upscaling past 1.0.
+float FitZoom(const Image &image, int padding, const SDL_DisplayMode &dm) {
   int maxW = std::max(1, dm.w - padding);
   int maxH = std::max(1, dm.h - padding);
 
-  float scaleX = (float)maxW / image->width;
-  float scaleY = (float)maxH / image->height;
-  float idealZoom = std::min({scaleX, scaleY, 1.0f});
-  int winHeight = (int)(image->height * idealZoom);
-  int winWidth = (int)(image->width * idealZoom);
-
-  ViewState vState;
-  vState.zoom = idealZoom;
-  vState.offsetX = 0.0f;
-  vState.offsetY = 0.0f;
-
-  Image sourceImage;
-  sourceImage.width = image->width;
-  sourceImage.height = image->height;
-  sourceImage.pixelData = image->pixelData;
-
-  std::vector<Pixel> processedBuffer(winWidth * winHeight);
-  InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
-                              winWidth, winHeight);
-
-  PPMViewer imageViewer(winWidth, winHeight);
-  imageViewer.DrawData(processedBuffer);
+  float scaleX = (float)maxW / image.imageHeader.width;
+  float scaleY = (float)maxH / image.imageHeader.height;
+  return std::min({scaleX, scaleY, 1.0f});
 }
 
-void ProcessImage(std::optional<Image> &image, const SDL_DisplayMode &dm,
-                  float zoom) {
-  int winHeight = (int)(image->height * zoom);
-  int winWidth = (int)(image->width * zoom);
+// Resamples the image into a window sized by `zoom` and shows it until closed.
+// Takes the source by const reference so the (potentially large) pixel buffer
+// is never copied.
+void RenderAtZoom(const Image &image, float zoom) {
+  int winWidth = (int)(image.imageHeader.width * zoom);
+  int winHeight = (int)(image.imageHeader.height * zoom);
 
   ViewState vState;
   vState.zoom = zoom;
   vState.offsetX = 0.0f;
   vState.offsetY = 0.0f;
 
-  Image sourceImage;
-  sourceImage.width = image->width;
-  sourceImage.height = image->height;
-  sourceImage.pixelData = image->pixelData;
-
   std::vector<Pixel> processedBuffer(winWidth * winHeight);
-  InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
-                              winWidth, winHeight);
+  InverseMap::ApplyInverseMap(image, vState, processedBuffer.data(), winWidth,
+                              winHeight);
 
   PPMViewer imageViewer(winWidth, winHeight);
   imageViewer.DrawData(processedBuffer);
@@ -164,10 +165,11 @@ int main(int argc, char *argv[]) {
 
   float zoomAmount = DEFAULTZOOM;
   bool zoomPreference = false;
+  uint threadCount = DEFAULTTHREADCOUNT;
 
-  std::vector<std::string> args(argv, argc + argv);
+  std::vector<std::string> args(argv, argv + argc);
 
-  if (!GetArgs(args, verboseFlag, filePath, zoomAmount)) {
+  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, threadCount)) {
     return 1;
   }
 
@@ -184,17 +186,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (auto image = Parser::ParseFile(filePath, verboseFlag)) {
-    if (image.has_value()) {
-      if (zoomPreference) {
-        ProcessImage(image, dm, zoomAmount);
-      } else {
-        ProcessImage(image, DEFAULTPADDING, dm);
-      }
-    } else {
-      std::cerr << "Error: Image failed to load" << "\n";
-    }
+  auto image = Parser::ParseFile(filePath, threadCount, verboseFlag);
+  if (!image) {
+    std::cerr << "Error: Image failed to load" << "\n";
+    return 1;
   }
+
+  float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
+  RenderAtZoom(*image, zoom);
 
   return 0;
 }

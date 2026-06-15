@@ -9,8 +9,9 @@ void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
     for (int x = 0; x < screenWidth; x++) {
       float u = (x - vState.offsetX) / vState.zoom;
       float v = (y - vState.offsetY) / vState.zoom;
-      if (u >= 0 && u < source.width - 1 && v >= 0 && v < source.height - 1 &&
-          source.width > 2 && source.height > 2) {
+      if (u >= 0 && u < source.imageHeader.width - 1 && v >= 0 &&
+          v < source.imageHeader.height - 1 && source.imageHeader.width > 2 &&
+          source.imageHeader.height > 2) {
         screenBuf[y * screenWidth + x] = lerper.SampleBilinear(&source, u, v);
 
       } else {

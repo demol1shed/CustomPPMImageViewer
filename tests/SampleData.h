@@ -21,6 +21,13 @@ constexpr int kWidth = 4;
 constexpr int kHeight = 4;
 constexpr int kPixelCount = kWidth * kHeight;
 
+// A larger P6 fixture (tests/samples/32x32_p6.ppm) following the same formula,
+// used to exercise multithreaded row-splitting across many thread counts —
+// 32 rows divide evenly by 2/4/8/16 and unevenly by 3/5/7.
+constexpr int kWidthLarge = 32;
+constexpr int kHeightLarge = 32;
+constexpr int kPixelCountLarge = kWidthLarge * kHeightLarge;
+
 inline Pixel expectedPixel(int i) {
   return Pixel{static_cast<uint8_t>(16 * i),
                static_cast<uint8_t>(255 - 16 * i),
@@ -31,10 +38,10 @@ inline Pixel expectedPixel(int i) {
 // exercise sampling/mapping without touching the filesystem.
 inline Image makeImage() {
   Image img;
-  img.width = kWidth;
-  img.height = kHeight;
-  img.ppmType = "P3";
-  img.maxVal = 255;
+  img.imageHeader.width = kWidth;
+  img.imageHeader.height = kHeight;
+  img.imageHeader.ppmType = "P3";
+  img.imageHeader.maxVal = 255;
   img.pixelData.resize(kPixelCount);
   for (int i = 0; i < kPixelCount; ++i) {
     img.pixelData[i] = expectedPixel(i);
@@ -49,6 +56,11 @@ inline const std::string &asciiPath() {
 
 inline const std::string &binaryPath() {
   static const std::string path = "tests/samples/4x4_p6.ppm";
+  return path;
+}
+
+inline const std::string &largeBinaryPath() {
+  static const std::string path = "tests/samples/32x32_p6.ppm";
   return path;
 }
 
