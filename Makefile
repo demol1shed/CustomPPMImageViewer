@@ -83,7 +83,18 @@ smoke: $(TARGET)
 	if [ $$fail -eq 0 ]; then echo "Smoke test passed."; \
 	else echo "Smoke test failed."; exit 1; fi
 
-clean:
-	rm -f src/*.o $(TARGET) $(TEST_TARGET)
+# Parser load-time microbenchmark. Lives in bench/ (not tests/) so the
+# run_tests wildcard never links its main(). Built at -O2 (not the project's
+# default -g) so timings reflect release performance; links only src/Parser.cpp
+# (no SDL, like run_tests). Dev tool, not a CI gate.
+BENCH_SRC    = bench/bench_parser.cpp
+BENCH_TARGET = bench_parser
 
-.PHONY: all test smoke clean
+bench: $(BENCH_SRC) src/Parser.cpp
+	$(CXX) -I include -std=c++17 -O2 -pthread $(BENCH_SRC) src/Parser.cpp -o $(BENCH_TARGET)
+	@./$(BENCH_TARGET)
+
+clean:
+	rm -f src/*.o $(TARGET) $(TEST_TARGET) $(BENCH_TARGET)
+
+.PHONY: all test smoke bench clean
