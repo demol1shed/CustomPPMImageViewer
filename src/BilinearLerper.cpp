@@ -12,8 +12,9 @@ Pixel BilinearLerper::Lerp(Pixel a, Pixel b, float d) {
   return result;
 }
 
-int BilinearLerper::GiveFlattenedIndexOf(int d, int i, int j) {
-  return (i * d) + j;
+int BilinearLerper::GiveFlattenedIndexOf(int w, int i, int j) {
+  // w = row width (column count); i = row (y), j = column (x).
+  return (i * w) + j;
 }
 
 Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {

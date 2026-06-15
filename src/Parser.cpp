@@ -51,7 +51,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
                                        uint threadCount, bool verbose) {
   std::ifstream file(filePath, std::ios::binary);
   if (!file.is_open()) {
-    std::cerr << "File at" << filePath << " could not be found or opened.\n";
+    std::cerr << "File at " << filePath << " could not be found or opened.\n";
     return std::nullopt;
   }
 
@@ -123,7 +123,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
               << "\n";
     return std::nullopt;
   }
-  image.imageHeader.maxVal = static_cast<uint16_t>(maxValInt);
+  image.imageHeader.maxVal = static_cast<uint8_t>(maxValInt);
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
               << image.imageHeader.ppmType
