@@ -13,6 +13,9 @@ private:
   bool PtrChecks();
 
 public:
+  // width/height must already fit the display (e.g. via ComputeWindowSize).
+  // The viewer creates a window and texture at exactly these dimensions and
+  // does not clamp internally, so DrawData's upload pitch matches the buffer.
   PPMViewer(int width, int height);
   ~PPMViewer();
   void DrawData(const std::vector<Pixel> &pixelData);

@@ -2,6 +2,7 @@
 #include <InverseMap.h>
 #include <PPMViewer.h>
 #include <Parser.h>
+#include <RenderGeometry.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_video.h>
 #include <ViewState.h>
@@ -139,23 +140,27 @@ float FitZoom(const Image &image, int padding, const SDL_DisplayMode &dm) {
   return std::min({scaleX, scaleY, 1.0f});
 }
 
-// Resamples the image into a window sized by `zoom` and shows it until closed.
-// Takes the source by const reference so the (potentially large) pixel buffer
-// is never copied.
-void RenderAtZoom(const Image &image, float zoom) {
-  int winWidth = (int)(image.imageHeader.width * zoom);
-  int winHeight = (int)(image.imageHeader.height * zoom);
+// Resamples the image into a window sized by `zoom` (clamped to the display)
+// and shows it until closed. Takes the source by const reference so the
+// (potentially large) pixel buffer is never copied.
+void RenderAtZoom(const Image &image, float zoom, const SDL_DisplayMode &dm) {
+  // Decide the window size once and use it for the buffer, the resampler, and
+  // the viewer, so the SDL texture pitch always matches the buffer row stride
+  // (a mismatch here is what sheared the image at high zoom). See
+  // RenderGeometry.h. Beyond the fit point this shows the top-left region.
+  WinSize win = ComputeWindowSize(image.imageHeader.width,
+                                  image.imageHeader.height, zoom, dm.w, dm.h);
 
   ViewState vState;
   vState.zoom = zoom;
   vState.offsetX = 0.0f;
   vState.offsetY = 0.0f;
 
-  std::vector<Pixel> processedBuffer(winWidth * winHeight);
-  InverseMap::ApplyInverseMap(image, vState, processedBuffer.data(), winWidth,
-                              winHeight);
+  std::vector<Pixel> processedBuffer(win.w * win.h);
+  InverseMap::ApplyInverseMap(image, vState, processedBuffer.data(), win.w,
+                              win.h);
 
-  PPMViewer imageViewer(winWidth, winHeight);
+  PPMViewer imageViewer(win.w, win.h);
   imageViewer.DrawData(processedBuffer);
 }
 
@@ -193,7 +198,7 @@ int main(int argc, char *argv[]) {
   }
 
   float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
-  RenderAtZoom(*image, zoom);
+  RenderAtZoom(*image, zoom, dm);
 
   return 0;
 }
