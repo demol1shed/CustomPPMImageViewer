@@ -60,6 +60,17 @@ smoke: $(TARGET)
 	    fi; \
 	  done; \
 	done; \
+	for f in $(TEST_DIR)/samples/4x4_p6.ppm $(TEST_DIR)/samples/32x32_p6.ppm; do \
+	  for z in 2.0 50; do \
+	    SDL_VIDEODRIVER=dummy timeout 5 ./$(TARGET) $$f -z $$z >/dev/null 2>&1; \
+	    code=$$?; \
+	    if [ $$code -ge 128 ]; then \
+	      echo "  [FAIL] $$f -z $$z crashed with signal $$((code - 128))"; fail=1; \
+	    else \
+	      echo "  [OK]   $$f -z $$z (no crash)"; \
+	    fi; \
+	  done; \
+	done; \
 	if [ -f test.ppm ]; then \
 	  SDL_VIDEODRIVER=dummy timeout 10 ./$(TARGET) test.ppm -t 16 >/dev/null 2>&1; \
 	  code=$$?; \
