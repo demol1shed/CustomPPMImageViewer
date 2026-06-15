@@ -64,4 +64,10 @@ inline const std::string &largeBinaryPath() {
   return path;
 }
 
+// The 32x32 image in ASCII (P3), for the parallel-P3 thread sweep.
+inline const std::string &asciiLargePath() {
+  static const std::string path = "tests/samples/32x32.ppm";
+  return path;
+}
+
 } // namespace sample

@@ -49,7 +49,7 @@ smoke: $(TARGET)
 	    echo "  [FAIL] $$f did not parse as expected (exit $$code)"; fail=1; \
 	  fi; \
 	done; \
-	for f in $(TEST_DIR)/samples/4x4_p6.ppm $(TEST_DIR)/samples/32x32_p6.ppm; do \
+	for f in $(TEST_DIR)/samples/4x4_p6.ppm $(TEST_DIR)/samples/32x32_p6.ppm $(TEST_DIR)/samples/32x32.ppm; do \
 	  for t in 1 4 16; do \
 	    SDL_VIDEODRIVER=dummy timeout 5 ./$(TARGET) $$f -t $$t >/dev/null 2>&1; \
 	    code=$$?; \

@@ -24,3 +24,4 @@ bench_parser
 !tests/samples/4x4.ppm
 !tests/samples/4x4_p6.ppm
 !tests/samples/32x32_p6.ppm
+!tests/samples/32x32.ppm
