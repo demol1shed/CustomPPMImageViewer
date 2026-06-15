@@ -1,0 +1,9 @@
+P3
+# 4x4 test fixture -- pixel i (row-major) = (16*i, 255-16*i, 8*i)
+# the comment lines and trailing inline values also exercise the parser
+4 4
+255
+0 255 0      16 239 8     32 223 16    48 207 24
+64 191 32    80 175 40    96 159 48    112 143 56
+128 127 64   144 111 72   160 95 80    176 79 88
+192 63 96    208 47 104   224 31 112   240 15 120
