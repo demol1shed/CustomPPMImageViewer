@@ -10,13 +10,16 @@ tests assert on exact pixel values instead.
 | Path | Purpose |
 |------|---------|
 | `TestFramework.h` | Tiny header-only test harness (`TEST`, `CHECK_*`, runner). No external libs. |
-| `SampleData.h` | Shared 4x4 fixture definition + in-memory image builder. |
+| `SampleData.h` | Shared fixture definitions (4x4 + 32x32) + in-memory image builder. |
 | `test_main.cpp` | Runner entry point (`testing::runAll()`). |
-| `test_parser.cpp` | `Parser::ParseFile` — P3/P6 headers, pixels, cross-format agreement, missing file. |
+| `test_parser.cpp` | `Parser::ParseFile` — P3/P6 headers, pixels, cross-format agreement, missing file, parallel-vs-serial on 4x4. |
+| `test_parser_mt.cpp` | Multithreaded P6 decode on the 32x32 fixture — parallel equals serial and the known formula across many thread counts. |
+| `test_rowranges.cpp` | `Parser::ComputeRowRanges` — the row partition is gap-free, non-overlapping, and covers exactly `[0, height)`. |
 | `test_bilinear.cpp` | `BilinearLerper::SampleBilinear` — exact pixels and blended midpoints. |
 | `test_inversemap.cpp` | `InverseMap::ApplyInverseMap` — bounds/black edges, upscaling, degenerate image. |
 | `samples/4x4.ppm` | Known 4x4 ASCII (P3) fixture (with comments, to exercise the parser). |
 | `samples/4x4_p6.ppm` | The same image in raw binary (P6). |
+| `samples/32x32_p6.ppm` | Larger raw P6 (same formula) so multithreaded row-splitting is exercised. |
 
 ## Running
 
@@ -57,6 +60,19 @@ data = bytearray(b"P6\n4 4\n255\n")
 for i in range(16):
     data += bytes([(16*i) & 0xff, (255-16*i) & 0xff, (8*i) & 0xff])
 open("tests/samples/4x4_p6.ppm", "wb").write(data)
+PY
+```
+
+The 32x32 P6 fixture (`samples/32x32_p6.ppm`) uses the same formula over
+`W=H=32` and is regenerated the same way:
+
+```bash
+python3 - <<'PY'
+W = H = 32
+data = bytearray(f"P6\n{W} {H}\n255\n".encode())
+for i in range(W*H):
+    data += bytes([(16*i) & 0xff, (255-16*i) & 0xff, (8*i) & 0xff])
+open("tests/samples/32x32_p6.ppm", "wb").write(data)
 PY
 ```
 

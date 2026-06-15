@@ -22,3 +22,4 @@ run_tests
 # Keep committed test fixtures even though *.ppm is ignored above
 !tests/samples/4x4.ppm
 !tests/samples/4x4_p6.ppm
+!tests/samples/32x32_p6.ppm
