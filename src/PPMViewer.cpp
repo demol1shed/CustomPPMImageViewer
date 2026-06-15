@@ -1,26 +1,15 @@
 #include <PPMViewer.h>
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keycode.h>
-#include <iostream>
 
 PPMViewer::PPMViewer(int width, int height) {
+  // The caller passes display-fitting dimensions (see ComputeWindowSize); the
+  // viewer renders at exactly this size, so the texture pitch matches the
+  // source buffer's row stride. No internal clamping (a second, independent
+  // clamp here was the source of the high-zoom diagonal-shear bug).
   this->width = width;
   this->height = height;
 
-  SDL_DisplayMode dm;
-
-  if (SDL_GetDesktopDisplayMode(0, &dm) == 0) {
-    // clamp image width if larger
-    if (this->width > dm.w) {
-      this->width = dm.w;
-    }
-    // clamp image height if larger
-    if (this->height > dm.h) {
-      this->height = dm.h;
-    }
-  } else {
-    std::cerr << "Warning: Could not get display mode. Using image size.\n";
-  }
   pWin = SDL_CreateWindow("PPM Image Viewer", SDL_WINDOWPOS_CENTERED,
                           SDL_WINDOWPOS_CENTERED, this->width, this->height,
                           SDL_WINDOW_SHOWN);
