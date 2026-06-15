@@ -67,7 +67,7 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
     return false;
   }
 
-  for (int i = 1; i < argv.size(); i++) {
+  for (size_t i = 1; i < argv.size(); i++) {
     std::string arg = argv[i];
 
     if (arg == "-v" || arg == "--verbose") {
@@ -128,54 +128,32 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
   return true;
 }
 
-// after parsing
-void ProcessImage(std::optional<Image> &image, const int padding,
-                  const SDL_DisplayMode &dm) {
+// Computes the zoom that fits the image inside the desktop work area (display
+// size minus padding), never upscaling past 1.0.
+float FitZoom(const Image &image, int padding, const SDL_DisplayMode &dm) {
   int maxW = std::max(1, dm.w - padding);
   int maxH = std::max(1, dm.h - padding);
 
-  float scaleX = (float)maxW / image->imageHeader.width;
-  float scaleY = (float)maxH / image->imageHeader.height;
-  float idealZoom = std::min({scaleX, scaleY, 1.0f});
-  int winHeight = (int)(image->imageHeader.height * idealZoom);
-  int winWidth = (int)(image->imageHeader.width * idealZoom);
-
-  ViewState vState;
-  vState.zoom = idealZoom;
-  vState.offsetX = 0.0f;
-  vState.offsetY = 0.0f;
-
-  Image sourceImage;
-  sourceImage.imageHeader.width = image->imageHeader.width;
-  sourceImage.imageHeader.height = image->imageHeader.height;
-  sourceImage.pixelData = image->pixelData;
-
-  std::vector<Pixel> processedBuffer(winWidth * winHeight);
-  InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
-                              winWidth, winHeight);
-
-  PPMViewer imageViewer(winWidth, winHeight);
-  imageViewer.DrawData(processedBuffer);
+  float scaleX = (float)maxW / image.imageHeader.width;
+  float scaleY = (float)maxH / image.imageHeader.height;
+  return std::min({scaleX, scaleY, 1.0f});
 }
 
-void ProcessImage(std::optional<Image> &image, const SDL_DisplayMode &dm,
-                  float zoom) {
-  int winHeight = (int)(image->imageHeader.height * zoom);
-  int winWidth = (int)(image->imageHeader.width * zoom);
+// Resamples the image into a window sized by `zoom` and shows it until closed.
+// Takes the source by const reference so the (potentially large) pixel buffer
+// is never copied.
+void RenderAtZoom(const Image &image, float zoom) {
+  int winWidth = (int)(image.imageHeader.width * zoom);
+  int winHeight = (int)(image.imageHeader.height * zoom);
 
   ViewState vState;
   vState.zoom = zoom;
   vState.offsetX = 0.0f;
   vState.offsetY = 0.0f;
 
-  Image sourceImage;
-  sourceImage.imageHeader.width = image->imageHeader.width;
-  sourceImage.imageHeader.height = image->imageHeader.height;
-  sourceImage.pixelData = image->pixelData;
-
   std::vector<Pixel> processedBuffer(winWidth * winHeight);
-  InverseMap::ApplyInverseMap(sourceImage, vState, processedBuffer.data(),
-                              winWidth, winHeight);
+  InverseMap::ApplyInverseMap(image, vState, processedBuffer.data(), winWidth,
+                              winHeight);
 
   PPMViewer imageViewer(winWidth, winHeight);
   imageViewer.DrawData(processedBuffer);
@@ -189,7 +167,7 @@ int main(int argc, char *argv[]) {
   bool zoomPreference = false;
   uint threadCount = DEFAULTTHREADCOUNT;
 
-  std::vector<std::string> args(argv, argc + argv);
+  std::vector<std::string> args(argv, argv + argc);
 
   if (!GetArgs(args, verboseFlag, filePath, zoomAmount, threadCount)) {
     return 1;
@@ -208,17 +186,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (auto image = Parser::ParseFile(filePath, threadCount, verboseFlag)) {
-    if (image.has_value()) {
-      if (zoomPreference) {
-        ProcessImage(image, dm, zoomAmount);
-      } else {
-        ProcessImage(image, DEFAULTPADDING, dm);
-      }
-    } else {
-      std::cerr << "Error: Image failed to load" << "\n";
-    }
+  auto image = Parser::ParseFile(filePath, threadCount, verboseFlag);
+  if (!image) {
+    std::cerr << "Error: Image failed to load" << "\n";
+    return 1;
   }
+
+  float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
+  RenderAtZoom(*image, zoom);
 
   return 0;
 }
