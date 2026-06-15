@@ -1,6 +1,6 @@
 CXX ?= c++
-CXXFLAGS = -I include -Wall -std=c++17 -g
-LDFLAGS = -lSDL2
+CXXFLAGS = -I include -Wall -std=c++17 -g -pthread
+LDFLAGS = -lSDL2 -pthread
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
