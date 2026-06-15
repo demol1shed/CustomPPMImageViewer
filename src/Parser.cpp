@@ -191,8 +191,10 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
               << "Color maximum value: " << maxValInt << "\n";
   }
 
-  // parsing pixel data
-  size_t totalPixels = image.imageHeader.width * image.imageHeader.height;
+  // parsing pixel data. Cast before multiplying so the product is computed in
+  // size_t and cannot overflow int on very large images.
+  size_t totalPixels =
+      static_cast<size_t>(image.imageHeader.width) * image.imageHeader.height;
   image.pixelData.resize(totalPixels);
 
   if (image.imageHeader.ppmType == "P6") {
@@ -251,8 +253,14 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       }
     } else {
       // Serial fallback: one contiguous read from the current cursor.
-      file.read(reinterpret_cast<char *>(image.pixelData.data()),
-                totalPixels * sizeof(Pixel));
+      const std::streamsize want =
+          static_cast<std::streamsize>(totalPixels * sizeof(Pixel));
+      file.read(reinterpret_cast<char *>(image.pixelData.data()), want);
+      if (file.gcount() != want) {
+        std::cerr << "Error: P6 pixel data is truncated (" << file.gcount()
+                  << " of " << want << " bytes).\n";
+        return std::nullopt;
+      }
       if (verbose) {
         std::cout << "Binary P6 data read (serial). Bytes: " << file.gcount()
                   << "\n";
