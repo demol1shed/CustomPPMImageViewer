@@ -6,6 +6,15 @@ SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
 TARGET = view
 
+# Header dependency tracking: -MMD writes a src/<name>.d makefile fragment next
+# to each object listing the headers it included, and -MP adds phony targets for
+# those headers so deleting one does not break the build. Including the
+# fragments below makes editing a .h rebuild exactly the objects that use it
+# (previously stale objects survived and failed at link time).
+DEPFLAGS = -MMD -MP
+DEP = $(OBJ:.o=.d)
+HEADERS = $(wildcard include/*.h)
+
 # --- Test build ------------------------------------------------------------
 # The unit-test runner links the algorithmic core (parser + scaling math)
 # directly, with no SDL and no app entry point, so it stays headless and fast.
@@ -19,14 +28,16 @@ $(TARGET): $(OBJ)
 	$(CXX) $(OBJ) -o $(TARGET) $(LDFLAGS)
 
 src/%.o: src/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+
+-include $(DEP)
 
 # Build and run the deterministic unit tests. Returns non-zero if any fail,
 # so it doubles as a regression gate after touching parsing/interpolation.
 test: $(TEST_TARGET)
 	@./$(TEST_TARGET)
 
-$(TEST_TARGET): $(TEST_SRC) $(TESTED_SRC)
+$(TEST_TARGET): $(TEST_SRC) $(TESTED_SRC) $(HEADERS) $(wildcard $(TEST_DIR)/*.h)
 	$(CXX) $(CXXFLAGS) -I $(TEST_DIR) $(TEST_SRC) $(TESTED_SRC) -o $(TEST_TARGET)
 
 # Headless end-to-end smoke check: run the real executable with SDL's dummy
@@ -90,11 +101,11 @@ smoke: $(TARGET)
 BENCH_SRC    = bench/bench_parser.cpp
 BENCH_TARGET = bench_parser
 
-bench: $(BENCH_SRC) src/Parser.cpp
+bench: $(BENCH_SRC) src/Parser.cpp $(HEADERS)
 	$(CXX) -I include -std=c++17 -O2 -pthread $(BENCH_SRC) src/Parser.cpp -o $(BENCH_TARGET)
 	@./$(BENCH_TARGET)
 
 clean:
-	rm -f src/*.o $(TARGET) $(TEST_TARGET) $(BENCH_TARGET)
+	rm -f src/*.o src/*.d $(TARGET) $(TEST_TARGET) $(BENCH_TARGET)
 
 .PHONY: all test smoke bench clean
