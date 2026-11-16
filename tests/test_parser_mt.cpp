@@ -12,6 +12,10 @@ namespace {
 // Thread counts spanning: serial (1), even/uneven splits, exactly #rows (32),
 // just over #rows (33), and far over every cap (1000 -> clamped).
 const uint kThreadCounts[] = {1u, 2u, 3u, 4u, 5u, 8u, 16u, 32u, 33u, 1000u};
+
+// The fixtures are far below the default size thresholds (which would route
+// every call to the serial path), so the parallel tests disable size gating.
+const ParallelThresholds kForce = ParallelThresholds::AlwaysParallel();
 } // namespace
 
 TEST(ParserMT, LargeFixtureHeaderAndSize) {
@@ -34,7 +38,7 @@ TEST(ParserMT, ParallelMatchesSerialAcrossThreadCounts) {
     return;
 
   for (uint threads : kThreadCounts) {
-    auto parallel = Parser::ParseFile(sample::largeBinaryPath(), threads, false);
+    auto parallel = Parser::ParseFile(sample::largeBinaryPath(), threads, false, kForce);
     CHECK_TRUE(parallel.has_value());
     if (!parallel)
       continue;
@@ -51,7 +55,7 @@ TEST(ParserMT, ParallelMatchesSerialAcrossThreadCounts) {
 // Independent of the serial path: a multithreaded decode must reproduce the
 // known formula exactly, proving rows land at the right offsets.
 TEST(ParserMT, ParallelMatchesKnownFormula) {
-  auto img = Parser::ParseFile(sample::largeBinaryPath(), 8, false);
+  auto img = Parser::ParseFile(sample::largeBinaryPath(), 8, false, kForce);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
@@ -84,7 +88,7 @@ TEST(ParserMT, ParallelP3MatchesSerialAcrossThreadCounts) {
   if (!serial)
     return;
   for (uint threads : kThreadCounts) {
-    auto parallel = Parser::ParseFile(sample::asciiLargePath(), threads, false);
+    auto parallel = Parser::ParseFile(sample::asciiLargePath(), threads, false, kForce);
     CHECK_TRUE(parallel.has_value());
     if (!parallel)
       continue;
@@ -99,7 +103,7 @@ TEST(ParserMT, ParallelP3MatchesSerialAcrossThreadCounts) {
 }
 
 TEST(ParserMT, ParallelP3MatchesKnownFormula) {
-  auto img = Parser::ParseFile(sample::asciiLargePath(), 8, false);
+  auto img = Parser::ParseFile(sample::asciiLargePath(), 8, false, kForce);
   CHECK_TRUE(img.has_value());
   if (!img)
     return;
@@ -112,8 +116,8 @@ TEST(ParserMT, ParallelP3MatchesKnownFormula) {
 
 // P3 cross-check: the 32x32 ASCII and binary fixtures must decode identically.
 TEST(ParserMT, P3AndP6LargeFixturesAgree) {
-  auto ascii = Parser::ParseFile(sample::asciiLargePath(), 8, false);
-  auto binary = Parser::ParseFile(sample::largeBinaryPath(), 8, false);
+  auto ascii = Parser::ParseFile(sample::asciiLargePath(), 8, false, kForce);
+  auto binary = Parser::ParseFile(sample::largeBinaryPath(), 8, false, kForce);
   CHECK_TRUE(ascii.has_value());
   CHECK_TRUE(binary.has_value());
   if (!ascii || !binary)
@@ -123,4 +127,23 @@ TEST(ParserMT, P3AndP6LargeFixturesAgree) {
   for (size_t i = 0; i < ascii->pixelData.size(); ++i)
     CHECK_PIXEL(ascii->pixelData[i], binary->pixelData[i].r,
                 binary->pixelData[i].g, binary->pixelData[i].b);
+}
+
+// With the DEFAULT thresholds these tiny fixtures are below the size gate, so
+// any -t must quietly fall back to the serial path and still decode correctly.
+TEST(ParserMT, DefaultThresholdsStillDecodeSmallInputs) {
+  for (const std::string &path :
+       {sample::largeBinaryPath(), sample::asciiLargePath()}) {
+    for (uint threads : kThreadCounts) {
+      auto img = Parser::ParseFile(path, threads, false);
+      CHECK_TRUE(img.has_value());
+      if (!img)
+        continue;
+      CHECK_EQ(sample::kPixelCountLarge, static_cast<int>(img->pixelData.size()));
+      for (int i = 0; i < sample::kPixelCountLarge; ++i) {
+        const Pixel e = sample::expectedPixel(i);
+        CHECK_PIXEL(img->pixelData[i], e.r, e.g, e.b);
+      }
+    }
+  }
 }

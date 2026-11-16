@@ -8,8 +8,11 @@
 //
 // How to read the numbers:
 //   * P6 (binary) decode is one big read into a pre-sized buffer -> it is
-//     I/O / memcpy bound. Parallel gains are modest and can even regress at
-//     high thread counts on small files (thread-spawn overhead > work saved).
+//     I/O / memcpy bound. Parallel gains are modest and regress on small
+//     files (thread-spawn overhead > work saved), which is why the parser
+//     size-gates threading (ParallelThresholds). Rows where the gate keeps
+//     the parse serial therefore show ~1.00x; pass --always-parallel to see
+//     the ungated numbers.
 //   * P3 (ASCII) decode is CPU bound. The biggest single lever is the
 //     single-thread parsing strategy (iostream >> vs from_chars); threading is
 //     a secondary multiplier on top. Compare a P3 row's 1-thread time before
@@ -27,6 +30,11 @@
 #include <vector>
 
 namespace {
+
+// Default: the size-gated behaviour users get. `--always-parallel` disables
+// the gate so every -t really spawns workers -- use it to re-measure the
+// break-even sizes when retuning ParallelThresholds.
+ParallelThresholds gThresholds;
 
 constexpr int kRepeats = 7;
 constexpr int kSynthW = 1024;
@@ -95,7 +103,7 @@ struct Stat {
 Stat timeParse(const std::string &path, unsigned threads, int repeats) {
   Stat s;
   // Warm the page cache and confirm the file parses before timing.
-  if (!Parser::ParseFile(path, threads, false))
+  if (!Parser::ParseFile(path, threads, false, gThresholds))
     return s;
 
   std::vector<double> samples;
@@ -103,7 +111,7 @@ Stat timeParse(const std::string &path, unsigned threads, int repeats) {
   std::uint64_t checksum = 0;
   for (int k = 0; k < repeats; ++k) {
     const auto t0 = std::chrono::steady_clock::now();
-    auto img = Parser::ParseFile(path, threads, false);
+    auto img = Parser::ParseFile(path, threads, false, gThresholds);
     const auto t1 = std::chrono::steady_clock::now();
     if (!img)
       return s;
@@ -160,8 +168,15 @@ void benchFile(const std::string &path) {
 } // namespace
 
 int main(int argc, char **argv) {
-  std::string p6 = (argc > 1) ? argv[1] : "test.ppm";
-  std::string p3 = (argc > 2) ? argv[2] : "testascii.ppm";
+  std::vector<std::string> paths;
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--always-parallel")
+      gThresholds = ParallelThresholds::AlwaysParallel();
+    else
+      paths.push_back(argv[i]);
+  }
+  std::string p6 = (paths.size() > 0) ? paths[0] : "test.ppm";
+  std::string p3 = (paths.size() > 1) ? paths[1] : "testascii.ppm";
 
   if (!fileExists(p6)) {
     p6 = "/tmp/bench_synth_p6.ppm";
