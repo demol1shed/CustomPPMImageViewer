@@ -5,6 +5,7 @@ This is a lightweight, hardware accelerated C++ application for parsing and view
 * **Custom Parser:** Manually reads .ppm files, handling headers, comments, empty spaces and different types of formatting data.
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
 * **Smart Windowing:** Automatically resizes the window and the image according to the size of the image.
+* **Interactive Pan & Zoom:** Zoom around the cursor with the mouse wheel and drag to pan; redraws are resampled across all CPU cores.
 * **Multithreaded Loading:** Optionally reads raw (P6) pixel data across several threads to speed up loading large images.
 
 ## Dependencies
@@ -52,6 +53,15 @@ For raw (P6) images you can spread the pixel reading across multiple threads wit
 
 ```./view <path-to-your-image-file.ppm> [-t/--threads <count>]```
 
+### Controls
+| Input | Action |
+|---|---|
+| Mouse wheel, `+` / `-` | Zoom in / out (the wheel zooms around the cursor) |
+| Left-drag, arrow keys | Pan |
+| `0` or `R` | Reset the view |
+| `Esc` or `Q` | Quit |
+
+The current zoom level is shown in the window title.
 
 ## Project Structure
 ```
@@ -60,6 +70,7 @@ For raw (P6) images you can spread the pixel reading across multiple threads wit
 │   ├── Image.h             # Struct to hold image data
 │   ├── InverseMap.h        # Declarations of the inverse mapping algorithm
 │   ├── ViewState.h         # Struct to hold zooming and offsetting data
+│   ├── ViewController.h    # Declarations of the interactive zoom/pan math
 │   ├── Pixel.h             # Packed struct for pixel data
 │   ├── Parser.h            # Declarations of file reading and text parsing
 │   └── PPMViewer.h         # Declarations of SDL2 window creation and rendering
@@ -68,12 +79,12 @@ For raw (P6) images you can spread the pixel reading across multiple threads wit
 │   ├── Parser.cpp          # Implementations for file reading and parsing information
 │   ├── BilinearLerper.cpp  # Implementations for the bilinear interpolation algorithm
 │   ├── InverseMap.cpp      # Implementations for the inverse mapping algorithm
+│   ├── ViewController.cpp  # Implementations for the interactive zoom/pan math
 │   └── PPMViewer.cpp       # Implementations for window creation and rendering the image
 ├── Makefile              # Build configuration file
 └── README.md             # README file?
 ```
 
 ## TODO:
-* Interactive panning and zooming system
 * Implementation of a better way of passing files to the program
 * Support for different formats

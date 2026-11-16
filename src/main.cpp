@@ -1,16 +1,16 @@
 #include "Pixel.h"
-#include <InverseMap.h>
 #include <PPMViewer.h>
 #include <Parser.h>
 #include <RenderGeometry.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_video.h>
-#include <ViewState.h>
+#include <ViewController.h>
 #include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 constexpr float DEFAULTZOOM = 1.0f;
@@ -58,7 +58,12 @@ void PrintHelp() {
       << "  -v,         --verbose               Enable verbose output\n"
       << "  -z <float>, --zoom <float>          Set the initial zoom "
          "level (e.g., 2.0)\n"
-      << "  -t  <uint>, --threads <uint>        Set thread count (e.g., 32)\n";
+      << "  -t  <uint>, --threads <uint>        Set thread count (e.g., 32)\n"
+      << bold << "Controls: " << reset << "\n"
+      << "  Mouse wheel, + / -                  Zoom in / out\n"
+      << "  Left-drag, arrow keys               Pan\n"
+      << "  0 or R                              Reset the view\n"
+      << "  Esc or Q                            Quit\n";
 }
 
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
@@ -140,28 +145,30 @@ float FitZoom(const Image &image, int padding, const SDL_DisplayMode &dm) {
   return std::min({scaleX, scaleY, 1.0f});
 }
 
-// Resamples the image into a window sized by `zoom` (clamped to the display)
-// and shows it until closed. Takes the source by const reference so the
-// (potentially large) pixel buffer is never copied.
-void RenderAtZoom(const Image &image, float zoom, const SDL_DisplayMode &dm) {
-  // Decide the window size once and use it for the buffer, the resampler, and
-  // the viewer, so the SDL texture pitch always matches the buffer row stride
-  // (a mismatch here is what sheared the image at high zoom). See
-  // RenderGeometry.h. Beyond the fit point this shows the top-left region.
+// Rendering a full-screen frame is always worth threading, independent of the
+// parse-oriented `-t` flag, so redraws use every reported core.
+// hardware_concurrency() may return 0 when unknown -> stay on one thread.
+unsigned RenderWorkerCount() {
+  return std::max(1u, std::thread::hardware_concurrency());
+}
+
+// Opens a window sized by `zoom` (clamped to the display) and runs the
+// interactive viewer until it is closed. Takes the source by const reference
+// so the (potentially large) pixel buffer is never copied.
+void ShowInteractive(const Image &image, float zoom,
+                     const SDL_DisplayMode &dm) {
+  // Decide the window size once and use it for the view math and the viewer
+  // (which sizes its frame buffer and texture from it), so the SDL texture
+  // pitch always matches the buffer row stride (a mismatch here is what
+  // sheared the image at high zoom). See RenderGeometry.h. Beyond the fit
+  // point the view starts at the top-left region and can be panned.
   WinSize win = ComputeWindowSize(image.imageHeader.width,
                                   image.imageHeader.height, zoom, dm.w, dm.h);
 
-  ViewState vState;
-  vState.zoom = zoom;
-  vState.offsetX = 0.0f;
-  vState.offsetY = 0.0f;
-
-  std::vector<Pixel> processedBuffer(win.w * win.h);
-  InverseMap::ApplyInverseMap(image, vState, processedBuffer.data(), win.w,
-                              win.h);
-
+  ViewController view(image.imageHeader.width, image.imageHeader.height, win.w,
+                      win.h, zoom);
   PPMViewer imageViewer(win.w, win.h);
-  imageViewer.DrawData(processedBuffer);
+  imageViewer.Run(image, view, RenderWorkerCount());
 }
 
 int main(int argc, char *argv[]) {
@@ -198,7 +205,7 @@ int main(int argc, char *argv[]) {
   }
 
   float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
-  RenderAtZoom(*image, zoom, dm);
+  ShowInteractive(*image, zoom, dm);
 
   return 0;
 }

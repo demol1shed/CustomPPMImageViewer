@@ -1,11 +1,29 @@
 #include <BilinearLerper.h>
 #include <InverseMap.h>
+#include <algorithm>
+#include <thread>
+#include <vector>
 
-void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
-                                 Pixel *screenBuf, int screenWidth,
-                                 int screenHeight) {
+namespace {
+
+// A band smaller than this is not worth a thread of its own: spawning one
+// costs about as much as resampling a few short rows.
+constexpr int kMinRowsPerWorker = 32;
+
+unsigned WorkersForRows(int screenHeight, unsigned requestedWorkers) {
+  const int affordable = screenHeight / kMinRowsPerWorker;
+  if (affordable < 2 || requestedWorkers < 2)
+    return 1;
+  return std::min(requestedWorkers, static_cast<unsigned>(affordable));
+}
+
+} // namespace
+
+void InverseMap::RenderRows(const Image &source, ViewState vState,
+                            Pixel *screenBuf, int screenWidth, int rowBegin,
+                            int rowEnd) {
   BilinearLerper lerper;
-  for (int y = 0; y < screenHeight; y++) {
+  for (int y = rowBegin; y < rowEnd; y++) {
     for (int x = 0; x < screenWidth; x++) {
       float u = (x - vState.offsetX) / vState.zoom;
       float v = (y - vState.offsetY) / vState.zoom;
@@ -20,4 +38,35 @@ void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
       }
     }
   }
+}
+
+void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
+                                 Pixel *screenBuf, int screenWidth,
+                                 int screenHeight, unsigned workerCount) {
+  const unsigned workers = WorkersForRows(screenHeight, workerCount);
+  if (workers < 2) {
+    RenderRows(source, vState, screenBuf, screenWidth, 0, screenHeight);
+    return;
+  }
+
+  // Thread safety without locks: worker i owns screen rows
+  // [height*i/workers, height*(i+1)/workers). The bands are contiguous and
+  // disjoint, so each worker writes only its own slice of screenBuf, and the
+  // source image and view state are only read. The 64-bit product keeps the
+  // band boundary from overflowing int on very tall frames.
+  const auto bandStart = [&](unsigned band) {
+    return static_cast<int>(static_cast<long long>(screenHeight) * band /
+                            workers);
+  };
+
+  std::vector<std::thread> helpers;
+  helpers.reserve(workers - 1);
+  for (unsigned band = 1; band < workers; band++) {
+    helpers.emplace_back(RenderRows, std::cref(source), vState, screenBuf,
+                         screenWidth, bandStart(band), bandStart(band + 1));
+  }
+  // The calling thread renders the first band instead of idling in join().
+  RenderRows(source, vState, screenBuf, screenWidth, 0, bandStart(1));
+  for (std::thread &helper : helpers)
+    helper.join();
 }

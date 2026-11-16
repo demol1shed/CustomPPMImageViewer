@@ -18,7 +18,8 @@ tests assert on exact pixel values instead.
 | `test_byteranges.cpp` | `Parser::ComputeByteRanges` + `CountTokensInRange` — the P3 byte partition tiles the region and each token is owned by exactly one window. |
 | `test_rendergeometry.cpp` | `ComputeWindowSize` — the zoom window is clamped to the display (no pitch/stride shear). |
 | `test_bilinear.cpp` | `BilinearLerper::SampleBilinear` — exact pixels and blended midpoints. |
-| `test_inversemap.cpp` | `InverseMap::ApplyInverseMap` — bounds/black edges, upscaling, degenerate image. |
+| `test_inversemap.cpp` | `InverseMap::ApplyInverseMap` — bounds/black edges, upscaling, degenerate image, threaded render equals serial. |
+| `test_viewcontroller.cpp` | `ViewController` — cursor-anchored zoom, zoom limits, pan clamping/centring, reset. |
 | `samples/4x4.ppm` | Known 4x4 ASCII (P3) fixture (with comments, to exercise the parser). |
 | `samples/4x4_p6.ppm` | The same image in raw binary (P6). |
 | `samples/32x32_p6.ppm` | Larger raw P6 (same formula) so multithreaded row-splitting is exercised. |

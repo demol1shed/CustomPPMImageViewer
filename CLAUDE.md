@@ -21,7 +21,7 @@ The rendering pipeline is custom-built:
 ## 3. Future Roadmap (Your Tasks)
 When assisting with this project, prioritize the following roadmap:
 1. **Multithreaded Parsing**: The primary architectural target is transitioning this to a 32-thread capable viewer. You must structure future parser optimizations around thread pools, mutexes, or lock-free data structures to drastically reduce load times for large P6 binaries.
-2. **Interactive Panning and Zooming**: The `ViewState` struct currently holds static data. We need to implement real-time SDL event polling for mouse wheel zooming and drag-to-pan mechanics.
+2. **Interactive Panning and Zooming**: **Implemented.** `ViewController` owns the zoom/pan math (pure, unit tested) and `PPMViewer::Run` translates SDL events (mouse wheel, left-drag, keys) into calls on it, re-rendering through the row-threaded `InverseMap`. Remaining ideas: a resizable window, and smoother redraws at large window sizes.
 3. **Format Expansion**: Future format support must follow the same raw-byte parsing philosophy while adhering to our modular OOP design (e.g., creating base `ImageParser` interfaces if necessary to avoid monolithic classes).
 
 ## 4. Crucial Code Segments & Architectural Quirks
@@ -31,7 +31,7 @@ You must thoroughly understand these parts of the codebase before making changes
   The `Pixel` struct is wrapped in `#pragma pack(push, 1)`. **Do not remove or alter this.** It is absolutely critical for portability and prevents the compiler from adding padding bytes. This allows `Parser.cpp` to safely use `reinterpret_cast<char *>()` to read massive blocks of P6 binary data directly into the `std::vector<Pixel>` buffer in one operation.
   
 - **`src/InverseMap.cpp` (Coordinate System)**:
-  We iterate over the *screen buffer*, not the image. For every screen pixel `(x, y)`, we calculate the corresponding fractional image coordinate `(u, v)` using the `ViewState` (zoom and offset). If `(u, v)` falls out of bounds, it renders black.
+  We iterate over the *screen buffer*, not the image (split into disjoint row bands, one per worker thread, for interactive redraws). For every screen pixel `(x, y)`, we calculate the corresponding fractional image coordinate `(u, v)` using the `ViewState` (zoom and offset). If `(u, v)` falls out of bounds, it renders black.
 
 - **`src/PPMViewer.cpp` (SDL Lifecycle & RAII)**:
   SDL pointers (`SDL_Window*`, `SDL_Renderer*`, `SDL_Texture*`) are managed manually. The destructor explicitly cleans these up. If adding new SDL primitives, ensure they are added to the cleanup lifecycle, or encapsulate them using smart pointers with custom deleters if it improves modularity without harming performance.
