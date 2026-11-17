@@ -20,9 +20,9 @@ The rendering pipeline is custom-built:
 
 ## 3. Future Roadmap (Your Tasks)
 When assisting with this project, prioritize the following roadmap:
-1. **Multithreaded Parsing**: **Implemented.** P6 and P3 parse in parallel (size-gated via `ParallelThresholds`), and parsing and redraws dispatch onto the shared `ThreadPool` (`include/ThreadPool.h`) instead of spawning threads per call. Remaining ideas (no commitment): mmap I/O, SIMD integer parsing, a cold-cache P6 benchmark.
+1. **Multithreaded Parsing**: **Implemented.** P6 and P3 parse in parallel (size-gated via `ParallelThresholds`), and parsing and redraws dispatch onto the shared fork-join `ThreadPool` (`include/ThreadPool.h`). **Standing rule:** all new parallel work (parsing, rendering, future formats) MUST go through `ThreadPool::Shared().Run(...)`, never per-call `std::thread` spawning. Tasks write disjoint slices, so no extra locking is needed (see the synchronisation notes in `src/ThreadPool.cpp`). The pool scales to `hardware_concurrency()` (16 on the dev box); the original 32-thread target was an aspiration and has not been measured. Remaining ideas (no commitment): mmap I/O, SIMD integer parsing, and a cold-cache P6 benchmark (`make bench` is warm-cache only).
 2. **Interactive Panning and Zooming**: **Implemented.** `ViewController` owns the zoom/pan math (pure, unit tested) and `PPMViewer::Run` translates SDL events (mouse wheel, left-drag, keys) into calls on it, re-rendering through the row-threaded `InverseMap`. Remaining ideas: a resizable window.
-3. **Format Expansion** (optional, not started): Future format support must follow the same raw-byte parsing philosophy while adhering to our modular OOP design (e.g., creating base `ImageParser` interfaces once a second format actually exists, to avoid monolithic classes).
+3. **Format Expansion** (optional, not started): Future format support must follow the same raw-byte parsing philosophy while adhering to our modular OOP design (rule 6.2). If a second format is ever added, the first step is extracting an `ImageParser` interface (with the PPM parser as its first implementation) rather than bolting the new format onto `Parser`.
 
 ## 4. Crucial Code Segments & Architectural Quirks
 You must thoroughly understand these parts of the codebase before making changes:
