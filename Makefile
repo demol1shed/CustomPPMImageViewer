@@ -20,7 +20,8 @@ HEADERS = $(wildcard include/*.h)
 # directly, with no SDL and no app entry point, so it stays headless and fast.
 TEST_DIR    = tests
 TEST_SRC    = $(wildcard $(TEST_DIR)/*.cpp)
-TESTED_SRC  = src/Parser.cpp src/BilinearLerper.cpp src/InverseMap.cpp
+TESTED_SRC  = src/Parser.cpp src/BilinearLerper.cpp src/InverseMap.cpp \
+              src/ViewController.cpp
 TEST_TARGET = run_tests
 
 all: $(TARGET)

@@ -80,3 +80,31 @@ TEST(InverseMap, DegenerateImageRendersBlack) {
     CHECK_PIXEL(p, 0, 0, 0);
   }
 }
+
+// The threaded resampler splits the screen rows into bands; whatever the
+// worker count (including more workers than the frame can use), the result
+// must be byte-identical to the single-threaded render.
+TEST(InverseMap, ThreadedRenderMatchesSerial) {
+  Image src = sample::makeImage();
+  ViewState vs;
+  vs.zoom = 37.5f;
+  vs.offsetX = -11.0f;
+  vs.offsetY = 9.0f; // leaves a black band at the top to cover that branch
+
+  const int w = 97;
+  const int h = 203; // not divisible by the worker counts below
+  std::vector<Pixel> serial(static_cast<size_t>(w * h));
+  InverseMap::ApplyInverseMap(src, vs, serial.data(), w, h, 1);
+
+  for (unsigned workers : {2u, 3u, 5u, 16u, 1000u}) {
+    // Pre-fill with a sentinel so an unwritten band cannot pass by accident.
+    std::vector<Pixel> threaded(static_cast<size_t>(w * h), Pixel{1, 2, 3});
+    InverseMap::ApplyInverseMap(src, vs, threaded.data(), w, h, workers);
+    bool identical = true;
+    for (size_t i = 0; i < serial.size(); ++i) {
+      identical = identical && serial[i].r == threaded[i].r &&
+                  serial[i].g == threaded[i].g && serial[i].b == threaded[i].b;
+    }
+    CHECK_TRUE(identical);
+  }
+}
