@@ -1,5 +1,6 @@
 #include "Pixel.h"
 #include <Parser.h>
+#include <ThreadPool.h>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -137,7 +138,7 @@ void ReportWorkerClamp(bool verbose, uint requested, unsigned workers) {
 }
 
 // Worker body: read one row range [startRow, endRow) of a P6 file into the
-// matching, disjoint slice of the pixel buffer. Runs on its own std::thread.
+// matching, disjoint slice of the pixel buffer. Runs as one ThreadPool task.
 //
 // Thread-safety (no mutex needed): each worker opens its OWN ifstream (an
 // independent file position) and writes ONLY pixelData[startRow*width ..
@@ -358,21 +359,17 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       // std::vector<bool>: bit-packing would make neighbouring workers write
       // the same word and race. Read only after join() (happens-before).
       std::vector<std::uint8_t> ok(ranges.size(), 0);
-      std::vector<std::thread> workers;
-      workers.reserve(ranges.size());
-
-      for (size_t i = 0; i < ranges.size(); ++i) {
+      Pixel *const pixels = image.pixelData.data();
+      // Run() blocks until every task is done, so capturing locals by
+      // reference is safe and the ok[] flags are readable right after.
+      ThreadPool::Shared().Run(ranges.size(), [&](std::size_t i) {
         if (ranges[i].startRow >= ranges[i].endRow) {
           ok[i] = 1; // empty range (more workers than rows): nothing to read
-          continue;
+          return;
         }
-        // filePath is decay-copied into the thread -> no dangling reference.
-        workers.emplace_back(ReadP6Range, filePath, dataStart, width,
-                             ranges[i].startRow, ranges[i].endRow,
-                             image.pixelData.data(), &ok[i]);
-      }
-      for (std::thread &worker : workers)
-        worker.join();
+        ReadP6Range(filePath, dataStart, width, ranges[i].startRow,
+                    ranges[i].endRow, pixels, &ok[i]);
+      });
 
       for (std::uint8_t flag : ok) {
         if (!flag) {
@@ -443,20 +440,14 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       // Pass 1: count the tokens each window owns.
       std::vector<std::size_t> counts(ranges.size(), 0);
       std::vector<std::uint8_t> ok1(ranges.size(), 0);
-      {
-        std::vector<std::thread> workers;
-        workers.reserve(ranges.size());
-        for (size_t i = 0; i < ranges.size(); ++i) {
-          if (ranges[i].start >= ranges[i].end) {
-            ok1[i] = 1; // empty window
-            continue;
-          }
-          workers.emplace_back(CountP3Range, base, n, ranges[i].start,
-                               ranges[i].end, &counts[i], &ok1[i]);
+      ThreadPool::Shared().Run(ranges.size(), [&](std::size_t i) {
+        if (ranges[i].start >= ranges[i].end) {
+          ok1[i] = 1; // empty window
+          return;
         }
-        for (std::thread &worker : workers)
-          worker.join();
-      }
+        CountP3Range(base, n, ranges[i].start, ranges[i].end, &counts[i],
+                     &ok1[i]);
+      });
       for (std::uint8_t flag : ok1) {
         if (!flag) {
           std::cerr << "Error: P3 count pass failed.\n";
@@ -478,21 +469,14 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
 
       // Pass 2: parse each window into its disjoint slice of flat.
       std::vector<std::uint8_t> ok2(ranges.size(), 0);
-      {
-        std::vector<std::thread> workers;
-        workers.reserve(ranges.size());
-        for (size_t i = 0; i < ranges.size(); ++i) {
-          if (counts[i] == 0) {
-            ok2[i] = 1; // nothing to write
-            continue;
-          }
-          workers.emplace_back(ParseP3Range, base, n, ranges[i].start,
-                               ranges[i].end, starts[i], counts[i], flat,
-                               &ok2[i]);
+      ThreadPool::Shared().Run(ranges.size(), [&](std::size_t i) {
+        if (counts[i] == 0) {
+          ok2[i] = 1; // nothing to write
+          return;
         }
-        for (std::thread &worker : workers)
-          worker.join();
-      }
+        ParseP3Range(base, n, ranges[i].start, ranges[i].end, starts[i],
+                     counts[i], flat, &ok2[i]);
+      });
       for (std::uint8_t flag : ok2) {
         if (!flag) {
           std::cerr << "Error: malformed P3 pixel value.\n";
