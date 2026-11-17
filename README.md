@@ -86,7 +86,3 @@ The current zoom level is shown in the window title.
 ├── Makefile              # Build configuration file
 └── README.md             # README file?
 ```
-
-## TODO:
-* Implementation of a better way of passing files to the program
-* Support for different formats

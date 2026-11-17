@@ -20,9 +20,9 @@ The rendering pipeline is custom-built:
 
 ## 3. Future Roadmap (Your Tasks)
 When assisting with this project, prioritize the following roadmap:
-1. **Multithreaded Parsing**: The primary architectural target is transitioning this to a 32-thread capable viewer. You must structure future parser optimizations around thread pools, mutexes, or lock-free data structures to drastically reduce load times for large P6 binaries.
-2. **Interactive Panning and Zooming**: **Implemented.** `ViewController` owns the zoom/pan math (pure, unit tested) and `PPMViewer::Run` translates SDL events (mouse wheel, left-drag, keys) into calls on it, re-rendering through the row-threaded `InverseMap`. Remaining ideas: a resizable window, and smoother redraws at large window sizes.
-3. **Format Expansion**: Future format support must follow the same raw-byte parsing philosophy while adhering to our modular OOP design (e.g., creating base `ImageParser` interfaces if necessary to avoid monolithic classes).
+1. **Multithreaded Parsing**: **Implemented.** P6 and P3 parse in parallel (size-gated via `ParallelThresholds`), and parsing and redraws dispatch onto the shared `ThreadPool` (`include/ThreadPool.h`) instead of spawning threads per call. Remaining ideas (no commitment): mmap I/O, SIMD integer parsing, a cold-cache P6 benchmark.
+2. **Interactive Panning and Zooming**: **Implemented.** `ViewController` owns the zoom/pan math (pure, unit tested) and `PPMViewer::Run` translates SDL events (mouse wheel, left-drag, keys) into calls on it, re-rendering through the row-threaded `InverseMap`. Remaining ideas: a resizable window.
+3. **Format Expansion** (optional, not started): Future format support must follow the same raw-byte parsing philosophy while adhering to our modular OOP design (e.g., creating base `ImageParser` interfaces once a second format actually exists, to avoid monolithic classes).
 
 ## 4. Crucial Code Segments & Architectural Quirks
 You must thoroughly understand these parts of the codebase before making changes:
