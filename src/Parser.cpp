@@ -15,7 +15,8 @@ namespace {
 constexpr uint MAX_THREAD_COUNT = 64;
 constexpr uint MIN_THREAD_COUNT = 1;
 
-// Below this row count the threading overhead outweighs the gain; read serially.
+// A single row cannot be split across workers; read serially. (Whether a
+// multi-row image is *worth* splitting is decided by ParallelThresholds.)
 constexpr int MIN_ROWS_FOR_THREADING = 2;
 
 // The C-locale whitespace set that the old `operator>>` skipped; kept explicit
@@ -105,7 +106,7 @@ void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
 // more than the detected core count, never above MAX_THREAD_COUNT, and never
 // more than the number of rows (extra workers would only get empty ranges).
 // hardware_concurrency() may return 0 if undetectable; in that case we leave
-// the core cap off and let ParseFile decide (it stays serial when hw < 2).
+// the core cap off and let MaxUsableWorkers decide (serial when hw < 2).
 unsigned EffectiveThreadCount(uint requested, int height) {
   unsigned hw = std::thread::hardware_concurrency();
   unsigned eff = requested < MIN_THREAD_COUNT ? MIN_THREAD_COUNT : requested;
@@ -116,6 +117,23 @@ unsigned EffectiveThreadCount(uint requested, int height) {
   if (height > 0 && eff > static_cast<unsigned>(height))
     eff = static_cast<unsigned>(height);
   return eff < 1 ? 1 : eff;
+}
+
+// Upper bound on workers before any size gating: the clamped request, or 1
+// when threading is impossible/unsafe (a single row, or fewer than two
+// reported cores -- hardware_concurrency() == 0 means unknown -> stay serial).
+unsigned MaxUsableWorkers(uint requested, int height) {
+  if (height < MIN_ROWS_FOR_THREADING ||
+      std::thread::hardware_concurrency() < 2)
+    return 1;
+  return EffectiveThreadCount(requested, height);
+}
+
+void ReportWorkerClamp(bool verbose, uint requested, unsigned workers) {
+  if (verbose && workers != requested) {
+    std::cout << "Note: requested " << requested << " thread(s), using "
+              << workers << " (clamped to cores/rows/input size).\n";
+  }
 }
 
 // Worker body: read one row range [startRow, endRow) of a P6 file into the
@@ -207,6 +225,20 @@ std::vector<ByteRange> Parser::ComputeByteRanges(std::size_t totalBytes,
   return ranges;
 }
 
+unsigned Parser::WorkersForWorkload(std::size_t workloadBytes,
+                                    unsigned maxWorkers,
+                                    std::size_t minBytesPerWorker) {
+  if (maxWorkers < 1)
+    return 1;
+  if (minBytesPerWorker < 1)
+    minBytesPerWorker = 1;
+  const std::size_t affordable = workloadBytes / minBytesPerWorker;
+  if (affordable < 1)
+    return 1;
+  return affordable < maxWorkers ? static_cast<unsigned>(affordable)
+                                 : maxWorkers;
+}
+
 std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
                                        std::size_t chunkStart,
                                        std::size_t chunkEnd) {
@@ -214,7 +246,8 @@ std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
-                                       uint threadCount, bool verbose) {
+                                       uint threadCount, bool verbose,
+                                       const ParallelThresholds &thresholds) {
   std::ifstream file(filePath, std::ios::binary);
   if (!file.is_open()) {
     std::cerr << "File at " << filePath << " could not be found or opened.\n";
@@ -307,19 +340,13 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
   if (image.imageHeader.ppmType == "P6") {
     const int width = image.imageHeader.width;
     const int height = image.imageHeader.height;
-    const unsigned effectiveThreads = EffectiveThreadCount(threadCount, height);
-    const unsigned hw = std::thread::hardware_concurrency();
-
-    if (verbose && effectiveThreads != threadCount) {
-      std::cout << "Note: requested " << threadCount << " thread(s), using "
-                << effectiveThreads << " (clamped to cores/rows/limits).\n";
-    }
-
-    // Parallelize only when worthwhile and safe: more than one usable worker,
-    // at least two reported cores (hw == 0 means unknown -> stay serial), and
-    // enough rows to be worth splitting.
-    const bool parallel = effectiveThreads >= 2 && hw >= 2 &&
-                          height >= MIN_ROWS_FOR_THREADING;
+    // Parallelize only when safe (MaxUsableWorkers) and worthwhile: each
+    // worker must get a slice big enough to repay its spawn cost.
+    const unsigned effectiveThreads = WorkersForWorkload(
+        totalPixels * sizeof(Pixel), MaxUsableWorkers(threadCount, height),
+        thresholds.p6MinBytesPerWorker);
+    ReportWorkerClamp(verbose, threadCount, effectiveThreads);
+    const bool parallel = effectiveThreads >= 2;
 
     if (parallel) {
       // The header getline loop left the file cursor exactly at the first
@@ -398,14 +425,15 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     const size_t n = buf.size();
 
     const int height = image.imageHeader.height;
-    const unsigned effectiveThreads = EffectiveThreadCount(threadCount, height);
-    const unsigned hw = std::thread::hardware_concurrency();
-    if (verbose && effectiveThreads != threadCount) {
-      std::cout << "Note: requested " << threadCount << " thread(s), using "
-                << effectiveThreads << " (clamped to cores/rows/limits).\n";
-    }
-    const bool parallel = effectiveThreads >= 2 && hw >= 2 &&
-                          height >= MIN_ROWS_FOR_THREADING;
+    unsigned effectiveThreads =
+        WorkersForWorkload(n, MaxUsableWorkers(threadCount, height),
+                           thresholds.p3MinBytesPerWorker);
+    // Two workers each run both passes over half the data -- about the serial
+    // workload -- so that split only wins on large inputs.
+    if (effectiveThreads == 2 && n < thresholds.p3MinBytesForTwoWorkers)
+      effectiveThreads = 1;
+    ReportWorkerClamp(verbose, threadCount, effectiveThreads);
+    const bool parallel = effectiveThreads >= 2;
 
     if (parallel) {
       // Split the value region into byte windows; workers share the read-only
