@@ -1,13 +1,13 @@
 #include <BilinearLerper.h>
 #include <InverseMap.h>
+#include <ThreadPool.h>
 #include <algorithm>
-#include <thread>
 #include <vector>
 
 namespace {
 
-// A band smaller than this is not worth a thread of its own: spawning one
-// costs about as much as resampling a few short rows.
+// A band smaller than this is not worth a task of its own: waking a pool
+// worker costs about as much as resampling a few short rows.
 constexpr int kMinRowsPerWorker = 32;
 
 unsigned WorkersForRows(int screenHeight, unsigned requestedWorkers) {
@@ -59,14 +59,10 @@ void InverseMap::ApplyInverseMap(const Image &source, ViewState vState,
                             workers);
   };
 
-  std::vector<std::thread> helpers;
-  helpers.reserve(workers - 1);
-  for (unsigned band = 1; band < workers; band++) {
-    helpers.emplace_back(RenderRows, std::cref(source), vState, screenBuf,
-                         screenWidth, bandStart(band), bandStart(band + 1));
-  }
-  // The calling thread renders the first band instead of idling in join().
-  RenderRows(source, vState, screenBuf, screenWidth, 0, bandStart(1));
-  for (std::thread &helper : helpers)
-    helper.join();
+  // The pool also runs tasks on the calling thread, and Run() returns only
+  // after every band is rendered, so the captured locals outlive the tasks.
+  ThreadPool::Shared().Run(workers, [&](std::size_t band) {
+    RenderRows(source, vState, screenBuf, screenWidth, bandStart(band),
+               bandStart(band + 1));
+  });
 }

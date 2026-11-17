@@ -71,6 +71,7 @@ The current zoom level is shown in the window title.
 │   ├── InverseMap.h        # Declarations of the inverse mapping algorithm
 │   ├── ViewState.h         # Struct to hold zooming and offsetting data
 │   ├── ViewController.h    # Declarations of the interactive zoom/pan math
+│   ├── ThreadPool.h        # Declarations of the shared fork-join thread pool
 │   ├── Pixel.h             # Packed struct for pixel data
 │   ├── Parser.h            # Declarations of file reading and text parsing
 │   └── PPMViewer.h         # Declarations of SDL2 window creation and rendering
@@ -80,6 +81,7 @@ The current zoom level is shown in the window title.
 │   ├── BilinearLerper.cpp  # Implementations for the bilinear interpolation algorithm
 │   ├── InverseMap.cpp      # Implementations for the inverse mapping algorithm
 │   ├── ViewController.cpp  # Implementations for the interactive zoom/pan math
+│   ├── ThreadPool.cpp      # Implementations for the shared fork-join thread pool
 │   └── PPMViewer.cpp       # Implementations for window creation and rendering the image
 ├── Makefile              # Build configuration file
 └── README.md             # README file?

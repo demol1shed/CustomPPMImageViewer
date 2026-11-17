@@ -21,7 +21,7 @@ HEADERS = $(wildcard include/*.h)
 TEST_DIR    = tests
 TEST_SRC    = $(wildcard $(TEST_DIR)/*.cpp)
 TESTED_SRC  = src/Parser.cpp src/BilinearLerper.cpp src/InverseMap.cpp \
-              src/ViewController.cpp
+              src/ViewController.cpp src/ThreadPool.cpp
 TEST_TARGET = run_tests
 
 all: $(TARGET)
@@ -102,8 +102,8 @@ smoke: $(TARGET)
 BENCH_SRC    = bench/bench_parser.cpp
 BENCH_TARGET = bench_parser
 
-bench: $(BENCH_SRC) src/Parser.cpp $(HEADERS)
-	$(CXX) -I include -std=c++17 -O2 -pthread $(BENCH_SRC) src/Parser.cpp -o $(BENCH_TARGET)
+bench: $(BENCH_SRC) src/Parser.cpp src/ThreadPool.cpp $(HEADERS)
+	$(CXX) -I include -std=c++17 -O2 -pthread $(BENCH_SRC) src/Parser.cpp src/ThreadPool.cpp -o $(BENCH_TARGET)
 	@./$(BENCH_TARGET)
 
 clean:
