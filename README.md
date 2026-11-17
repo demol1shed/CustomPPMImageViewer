@@ -86,3 +86,8 @@ The current zoom level is shown in the window title.
 ├── Makefile              # Build configuration file
 └── README.md             # README file?
 ```
+
+## Known limitations
+* The file is passed as a single positional argument; there is no multi-file or drag-and-drop support.
+* Only 8-bit (max value <= 255) P3 and P6 PPM files are supported.
+* The window keeps its initial size and cannot be resized.
