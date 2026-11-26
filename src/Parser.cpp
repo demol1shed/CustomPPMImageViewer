@@ -27,6 +27,57 @@ inline bool IsWhitespace(char c) {
          c == '\f';
 }
 
+bool ReadHeaderToken(std::istream &in, std::string &out) {
+  out.clear();
+  char c = 0;
+
+  while (in.get(c)) {
+    if (IsWhitespace(c)) {
+      continue;
+    }
+    if (c == '#') {
+      while (in.get(c) && c != '\n') {
+      }
+      continue;
+    }
+    out.push_back(c);
+    break;
+  }
+
+  if (out.empty()) {
+    return false;
+  }
+
+  while (true) {
+    const int next = in.peek();
+    if (next == std::char_traits<char>::eof()) {
+      break;
+    }
+    const char ch = static_cast<char>(next);
+    if (IsWhitespace(ch) || ch == '#') {
+      break;
+    }
+    in.get(c);
+    out.push_back(c);
+  }
+  return true;
+}
+
+bool ParseIntToken(const std::string &tok, int &out) {
+  if (tok.empty()) {
+    return false;
+  }
+  const char *begin = tok.data();
+  const char *end = begin + tok.size();
+  int value = 0;
+  const std::from_chars_result res = std::from_chars(begin, end, value);
+  if (res.ec != std::errc{} || res.ptr != end) {
+    return false;
+  }
+  out = value;
+  return true;
+}
+
 // Sentinel returned by WalkP3Tokens (parse mode) on a non-numeric token.
 constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
 
@@ -57,7 +108,8 @@ std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
     if (p >= N || p >= ce) // next token-start belongs to a later window
       break;
     const char *tokBegin = base + p;
-    while (p < N && !IsWhitespace(base[p])) // advance past token end (may pass ce)
+    while (p < N &&
+           !IsWhitespace(base[p])) // advance past token end (may pass ce)
       ++p;
     if (out) {
       int value = 0;
@@ -95,7 +147,8 @@ void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
                   std::uint8_t *okFlag) {
   *okFlag = 0;
   try {
-    const std::size_t got = WalkP3Tokens(base, N, cs, ce, flat, startValueIndex);
+    const std::size_t got =
+        WalkP3Tokens(base, N, cs, ce, flat, startValueIndex);
     if (got == kWalkError || got != expectedCount)
       return;
     *okFlag = 1;
@@ -218,7 +271,8 @@ std::vector<ByteRange> Parser::ComputeByteRanges(std::size_t totalBytes,
   // Balanced byte split; cast i to size_t before i*totalBytes so the product
   // is computed in size_t (totalBytes can be large for a big P3 file).
   for (int i = 0; i < threadCount; ++i) {
-    std::size_t start = (static_cast<std::size_t>(i) * totalBytes) / threadCount;
+    std::size_t start =
+        (static_cast<std::size_t>(i) * totalBytes) / threadCount;
     std::size_t end =
         (static_cast<std::size_t>(i + 1) * totalBytes) / threadCount;
     ranges.push_back({start, end});
@@ -255,75 +309,80 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     return std::nullopt;
   }
 
-  Image image;
-  std::string line;
-  std::stringstream ss;
+  // Pixel ceiling for overflow safety (~256MP -> ~768MiB)
+  constexpr std::size_t kMaxPixels = 256ull * 1024ull * 1024ull;
 
-  auto GetNextValidLine = [&]() { // take all vars by reference
-    while (std::getline(file, line)) {
-      size_t commentPos = line.find("#");
-      if (commentPos != std::string::npos) {
-        line = line.substr(0, commentPos);
-      }
+  std::string typeTok;
+  std::string wTok;
+  std::string hTok;
+  std::string maxValTok;
 
-      if (line.empty() ||
-          line.find_first_not_of(" \t\r\n") == std::string::npos)
-        continue;
-
-      return true;
-    }
-    return false;
-  };
-
-  // getting ppm type
-  if (!GetNextValidLine())
+  if (!ReadHeaderToken(file, typeTok) || !ReadHeaderToken(file, wTok) ||
+      !ReadHeaderToken(file, hTok) || !ReadHeaderToken(file, maxValTok)) {
+    std::cerr << "Error: incomplete PPM header. \n";
     return std::nullopt;
-  ss.clear();
-  ss.str(line);
-  ss >> image.imageHeader.ppmType;
-
-  // getting width and height
-  int w = -1,
-      h = -1; // do this to move until a valid width/height value is found
-  while (w == -1 || h == -1) {
-    if (ss.eof()) {
-      if (!GetNextValidLine())
-        return std::nullopt;
-      ss.clear();
-      ss.str(line);
-    }
-    if (w == -1)
-      ss >> w;
-    // width and height may be in differnt lines
-    if (ss.eof() && h == -1) {
-      if (!GetNextValidLine())
-        return std::nullopt;
-      ss.clear();
-      ss.str(line);
-    }
-    if (h == -1)
-      ss >> h;
   }
 
+  if (typeTok != "P3" && typeTok != "P6") {
+    std::cerr << "Error: unsupported PPM type '" << typeTok << "'\n";
+    return std::nullopt;
+  }
+
+  int w = 0;
+  int h = 0;
+  int maxValInt = 0;
+
+  if (!ParseIntToken(wTok, w) || !ParseIntToken(hTok, h) ||
+      !ParseIntToken(maxValTok, maxValInt)) {
+    std::cerr << "Error: invalid numeric value in PPM header. \n";
+    return std::nullopt;
+  }
+
+  if (w <= 0 || h <= 0) {
+    std::cerr << "Error: invalid PPM dimensions (" << w << "x" << h << ").\n";
+    return std::nullopt;
+  }
+
+  if (static_cast<std::size_t>(w) > kMaxPixels / static_cast<std::size_t>(h)) {
+    std::cerr << "Error: PPM image exceeds maximum supported pixel count.\n";
+    return std::nullopt;
+  }
+
+  if (maxValInt <= 0 || maxValInt > 255) {
+    std::cerr << "Error: unsupported maxVal " << maxValInt
+              << " (expected 1..255).\n";
+    return std::nullopt;
+  }
+
+  char sep = 0;
+
+  if (!file.get(sep)) {
+    std::cerr << "Error: unexpected EOF after maxVal.\n";
+    return std::nullopt;
+  }
+  if (sep == '#') {
+    bool foundNewline = false;
+    while (file.get(sep)) {
+      if (sep == '\n') {
+        foundNewline = true;
+        break;
+      }
+    }
+    if (!foundNewline) {
+      std::cerr << "Error: unterminated comment after maxVal.\n";
+      return std::nullopt;
+    }
+  } else if (!IsWhitespace(sep)) {
+    std::cerr << "Error: missing whitespace after maxVal.\n";
+    return std::nullopt;
+  }
+
+  Image image;
+  image.imageHeader.ppmType = typeTok;
   image.imageHeader.width = w;
   image.imageHeader.height = h;
-
-  // getting maxVal
-  int maxValInt = 0;
-  if (ss.eof()) {
-    if (!GetNextValidLine())
-      return std::nullopt;
-    ss.clear();
-    ss.str(line);
-  }
-
-  ss >> maxValInt;
-  if (maxValInt > 255) {
-    std::cerr << "Error: 16 bit ppms are not supported. MaxVal is " << maxValInt
-              << "\n";
-    return std::nullopt;
-  }
   image.imageHeader.maxVal = static_cast<uint8_t>(maxValInt);
+
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
               << image.imageHeader.ppmType
