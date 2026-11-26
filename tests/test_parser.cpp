@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -18,8 +19,9 @@ struct TempPpm {
   std::string path;
 
   TempPpm(const std::string &name, const std::string &bytes)
+      // The pid keeps parallel runs (make -j test test-asan) apart.
       : path((std::filesystem::temp_directory_path() /
-              ("ppmviewer_" + name + ".ppm"))
+              ("ppmviewer_" + std::to_string(getpid()) + "_" + name + ".ppm"))
                  .string()) {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
