@@ -17,8 +17,8 @@ tests assert on exact pixel values instead.
 | `test_rowranges.cpp` | `Parser::ComputeRowRanges` — the P6 row partition is gap-free, non-overlapping, and covers exactly `[0, height)`. |
 | `test_byteranges.cpp` | `Parser::ComputeByteRanges` + `CountTokensInRange` — the P3 byte partition tiles the region and each token is owned by exactly one window. |
 | `test_rendergeometry.cpp` | `ComputeWindowSize` — the zoom window is clamped to the display (no pitch/stride shear). |
-| `test_bilinear.cpp` | `BilinearLerper::SampleBilinear` — exact pixels and blended midpoints. |
-| `test_inversemap.cpp` | `InverseMap::ApplyInverseMap` — bounds/black edges, upscaling, degenerate image, threaded render equals serial. |
+| `test_bilinear.cpp` | `BilinearLerper::SampleBilinear` — exact pixels, blended midpoints, edge clamping, 1x1 images, rounding. |
+| `test_inversemap.cpp` | `InverseMap::ApplyInverseMap` — full-image bounds, upscaling, 1x1/2x2/empty images, threaded render equals serial. |
 | `test_viewcontroller.cpp` | `ViewController` — cursor-anchored zoom, zoom limits, pan clamping/centring, reset. |
 | `test_threadpool.cpp` | `ThreadPool` — each task runs once, blocking fork-join, reuse across batches, zero-worker inline mode, exception safety, concurrent callers. |
 | `samples/4x4.ppm` | Known 4x4 ASCII (P3) fixture (with comments, to exercise the parser). |
