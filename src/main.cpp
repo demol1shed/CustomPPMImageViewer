@@ -121,6 +121,13 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
             << "\n";
         return false;
       }
+    } else if (!arg.empty() && arg[0] == '-') {
+      std::cerr << "Error: Unknown option '" << arg << "' (see --help)\n";
+      return false;
+    } else if (!filePath.empty()) {
+      std::cerr << "Error: Only one file path is accepted, got '" << filePath
+                << "' and '" << arg << "'\n";
+      return false;
     } else {
       filePath = arg;
     }
