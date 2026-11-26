@@ -51,7 +51,6 @@ PPMViewer::~PPMViewer() {
     SDL_DestroyRenderer(pRen);
   if (pWin)
     SDL_DestroyWindow(pWin);
-  SDL_Quit();
 }
 bool PPMViewer::PtrChecks() {
   if (!pRen || !pTex) {

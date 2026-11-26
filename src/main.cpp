@@ -18,6 +18,19 @@ constexpr int DEFAULTPADDING = 200;
 constexpr int DEFAULTARGCOUNT = 7;
 constexpr uint DEFAULTTHREADCOUNT = 1;
 
+namespace {
+
+// Shuts SDL down on every exit path. Declared in main right after SDL_Init, so
+// it outlives (and is destroyed after) any PPMViewer.
+struct SdlVideoGuard {
+  SdlVideoGuard() = default;
+  ~SdlVideoGuard() { SDL_Quit(); }
+  SdlVideoGuard(const SdlVideoGuard &) = delete;
+  SdlVideoGuard &operator=(const SdlVideoGuard &) = delete;
+};
+
+} // namespace
+
 void PrintHelp() {
   const std::string red = "\033[31m";
   const std::string reset = "\033[0m";
@@ -192,6 +205,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "Could not initialize SDL to get screen size" << "\n";
     return 1;
   }
+  const SdlVideoGuard sdlGuard;
   SDL_DisplayMode dm;
   if (SDL_GetDesktopDisplayMode(0, &dm) != 0) {
     std::cerr << "Could not get display mode" << "\n";
