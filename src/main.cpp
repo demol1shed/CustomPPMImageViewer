@@ -18,6 +18,19 @@ constexpr int DEFAULTPADDING = 200;
 constexpr int DEFAULTARGCOUNT = 7;
 constexpr unsigned DEFAULTTHREADCOUNT = 1;
 
+namespace {
+
+// Shuts SDL down on every exit path. Declared in main right after SDL_Init, so
+// it outlives (and is destroyed after) any PPMViewer.
+struct SdlVideoGuard {
+  SdlVideoGuard() = default;
+  ~SdlVideoGuard() { SDL_Quit(); }
+  SdlVideoGuard(const SdlVideoGuard &) = delete;
+  SdlVideoGuard &operator=(const SdlVideoGuard &) = delete;
+};
+
+} // namespace
+
 void PrintHelp() {
   const std::string red = "\033[31m";
   const std::string reset = "\033[0m";
@@ -156,7 +169,7 @@ unsigned RenderWorkerCount() {
 // Opens a window sized by `zoom` (clamped to the display) and runs the
 // interactive viewer until it is closed. Takes the source by const reference
 // so the (potentially large) pixel buffer is never copied.
-void ShowInteractive(const Image &image, float zoom,
+bool ShowInteractive(const Image &image, float zoom,
                      const SDL_DisplayMode &dm) {
   // Decide the window size once and use it for the view math and the viewer
   // (which sizes its frame buffer and texture from it), so the SDL texture
@@ -169,7 +182,7 @@ void ShowInteractive(const Image &image, float zoom,
   ViewController view(image.imageHeader.width, image.imageHeader.height, win.w,
                       win.h, zoom);
   PPMViewer imageViewer(win.w, win.h);
-  imageViewer.Run(image, view, RenderWorkerCount());
+  return imageViewer.Run(image, view, RenderWorkerCount());
 }
 
 int main(int argc, char *argv[]) {
@@ -193,6 +206,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "Could not initialize SDL to get screen size" << "\n";
     return 1;
   }
+  const SdlVideoGuard sdlGuard;
   SDL_DisplayMode dm;
   if (SDL_GetDesktopDisplayMode(0, &dm) != 0) {
     std::cerr << "Could not get display mode" << "\n";
@@ -206,7 +220,5 @@ int main(int argc, char *argv[]) {
   }
 
   float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
-  ShowInteractive(*image, zoom, dm);
-
-  return 0;
+  return ShowInteractive(*image, zoom, dm) ? 0 : 1;
 }

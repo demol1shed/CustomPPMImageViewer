@@ -3,6 +3,7 @@
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keycode.h>
 #include <cmath>
+#include <iostream>
 #include <string>
 
 namespace {
@@ -26,14 +27,19 @@ PPMViewer::PPMViewer(int width, int height) {
   pWin = SDL_CreateWindow("PPM Image Viewer", SDL_WINDOWPOS_CENTERED,
                           SDL_WINDOWPOS_CENTERED, this->width, this->height,
                           SDL_WINDOW_SHOWN);
-  if (pWin) {
-    pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_ACCELERATED);
+  if (!pWin)
+    return;
 
-    // STREAMING: the texture is re-uploaded on every pan/zoom redraw.
-    pTex = SDL_CreateTexture(pRen, SDL_PIXELFORMAT_RGB24,
-                             SDL_TEXTUREACCESS_STREAMING, this->width,
-                             this->height);
-  }
+  pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_ACCELERATED);
+  if (!pRen)
+    pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_SOFTWARE);
+  if (!pRen)
+    return;
+
+  // STREAMING: the texture is re-uploaded on every pan/zoom redraw.
+  pTex = SDL_CreateTexture(pRen, SDL_PIXELFORMAT_RGB24,
+                           SDL_TEXTUREACCESS_STREAMING, this->width,
+                           this->height);
 }
 
 PPMViewer::~PPMViewer() {
@@ -45,10 +51,11 @@ PPMViewer::~PPMViewer() {
     SDL_DestroyRenderer(pRen);
   if (pWin)
     SDL_DestroyWindow(pWin);
-  SDL_Quit();
 }
 bool PPMViewer::PtrChecks() {
   if (!pRen || !pTex) {
+    std::cerr << "Error: could not set up the SDL window: " << SDL_GetError()
+              << "\n";
     return false;
   }
   return true;
@@ -141,10 +148,10 @@ bool PPMViewer::HandleEvent(const SDL_Event &event, ViewController &view,
   }
 }
 
-void PPMViewer::Run(const Image &image, ViewController &view,
+bool PPMViewer::Run(const Image &image, ViewController &view,
                     unsigned renderWorkers) {
   if (!PtrChecks()) {
-    return;
+    return false;
   }
   std::vector<Pixel> frame(static_cast<size_t>(width) * height);
   RenderView(image, view, frame, renderWorkers);
@@ -163,4 +170,10 @@ void PPMViewer::Run(const Image &image, ViewController &view,
     if (needsRedraw && !quit)
       RenderView(image, view, frame, renderWorkers);
   }
+
+  // The loop only ends without a quit request if SDL_WaitEvent failed.
+  if (!quit) {
+    std::cerr << "Error: SDL event loop failed: " << SDL_GetError() << "\n";
+  }
+  return quit;
 }
