@@ -67,7 +67,8 @@ void PrintHelp() {
 }
 
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
-             std::string &filePath, float &zoomAmount, uint &threadCount) {
+             std::string &filePath, float &zoomAmount, bool &zoomPreference,
+             uint &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
     return false;
@@ -86,6 +87,7 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
         std::string val = argv[i + 1];
         try {
           zoomAmount = std::stof(val);
+          zoomPreference = true;
         } catch (const std::invalid_argument &e) {
           std::cerr << "Error: Invalid zoom value. " << val
                     << " is not a number" << "\n";
@@ -181,12 +183,10 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> args(argv, argv + argc);
 
-  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, threadCount)) {
+  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, zoomPreference,
+               threadCount)) {
     return 1;
   }
-
-  if (zoomAmount != DEFAULTZOOM)
-    zoomPreference = true;
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "Could not initialize SDL to get screen size" << "\n";
