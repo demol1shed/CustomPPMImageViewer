@@ -155,7 +155,7 @@ unsigned RenderWorkerCount() {
 // Opens a window sized by `zoom` (clamped to the display) and runs the
 // interactive viewer until it is closed. Takes the source by const reference
 // so the (potentially large) pixel buffer is never copied.
-void ShowInteractive(const Image &image, float zoom,
+bool ShowInteractive(const Image &image, float zoom,
                      const SDL_DisplayMode &dm) {
   // Decide the window size once and use it for the view math and the viewer
   // (which sizes its frame buffer and texture from it), so the SDL texture
@@ -168,7 +168,7 @@ void ShowInteractive(const Image &image, float zoom,
   ViewController view(image.imageHeader.width, image.imageHeader.height, win.w,
                       win.h, zoom);
   PPMViewer imageViewer(win.w, win.h);
-  imageViewer.Run(image, view, RenderWorkerCount());
+  return imageViewer.Run(image, view, RenderWorkerCount());
 }
 
 int main(int argc, char *argv[]) {
@@ -205,7 +205,5 @@ int main(int argc, char *argv[]) {
   }
 
   float zoom = zoomPreference ? zoomAmount : FitZoom(*image, DEFAULTPADDING, dm);
-  ShowInteractive(*image, zoom, dm);
-
-  return 0;
+  return ShowInteractive(*image, zoom, dm) ? 0 : 1;
 }

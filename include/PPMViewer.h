@@ -10,8 +10,9 @@ private:
   SDL_Window *pWin = nullptr;
   SDL_Renderer *pRen = nullptr;
   SDL_Texture *pTex = nullptr;
-  int width, height; // carry to Image.h at some point
+  int width, height;
 
+  // False, with the SDL error on stderr, if window setup failed.
   bool PtrChecks();
 
   // Uploads a width*height frame to the texture and presents it.
@@ -36,6 +37,7 @@ public:
 
   // Shows `image` and blocks until the window is closed, letting the user
   // zoom (mouse wheel, +/-) and pan (left-drag, arrow keys) through `view`.
-  // `view` must have been built for this viewer's width/height.
-  void Run(const Image &image, ViewController &view, unsigned renderWorkers);
+  // `view` must have been built for this viewer's width/height. Returns false
+  // if the window could not be set up or the event loop failed.
+  bool Run(const Image &image, ViewController &view, unsigned renderWorkers);
 };
