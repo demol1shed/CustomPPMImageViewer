@@ -6,8 +6,9 @@
 // One mutex guards the batch description (thunk, context, size, nextTask,
 // finished). A batch is published and consumed entirely under that mutex:
 //
-//   caller:  lock -> publish batch -> notify workers -> claim/run tasks ->
-//            wait until finished == batchSize -> clear batch -> unlock
+//   caller:  lock -> publish batch -> notify workers (if > 1 task) ->
+//            claim/run tasks -> wait until finished == batchSize ->
+//            clear batch -> unlock
 //   worker:  lock -> wait for an unclaimed task -> claim index -> UNLOCK ->
 //            run task -> lock -> ++finished (notify caller if last)
 //
@@ -100,7 +101,12 @@ void ThreadPool::RunBatch(std::size_t taskCount, TaskThunk thunk,
   batchSize = taskCount;
   nextTask = 0;
   finished = 0;
-  if (!workers.empty())
+  // The caller runs one task itself, so wake only as many workers as can find
+  // work: none for a single task, one for two. A worker that is not woken
+  // cannot strand a task, because the caller drains whatever is unclaimed.
+  if (taskCount == 2)
+    workAvailable.notify_one();
+  else if (taskCount > 2)
     workAvailable.notify_all();
 
   // The caller works too instead of idling until the batch completes.
