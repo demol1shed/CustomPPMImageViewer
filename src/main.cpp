@@ -6,9 +6,10 @@
 #include <SDL2/SDL_video.h>
 #include <ViewController.h>
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <iostream>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -66,6 +67,14 @@ void PrintHelp() {
       << "  Esc or Q                            Quit\n";
 }
 
+// Parses all of `text` as a number; empty input, trailing characters and
+// out-of-range values are errors.
+template <typename T> bool ParseNumber(const std::string &text, T &out) {
+  const char *const end = text.data() + text.size();
+  const auto [ptr, ec] = std::from_chars(text.data(), end, out);
+  return ec == std::errc{} && ptr == end;
+}
+
 bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
              std::string &filePath, float &zoomAmount, bool &zoomPreference,
              uint &threadCount) {
@@ -84,19 +93,14 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
       return false;
     } else if (arg == "-z" || arg == "--zoom") {
       if (i + 1 < argv.size()) {
-        std::string val = argv[i + 1];
-        try {
-          zoomAmount = std::stof(val);
-          zoomPreference = true;
-        } catch (const std::invalid_argument &e) {
-          std::cerr << "Error: Invalid zoom value. " << val
-                    << " is not a number" << "\n";
-          return false;
-        } catch (const std::out_of_range &e) {
-          std::cerr << "Error: Zoom value too large" << "\n";
+        const std::string &val = argv[i + 1];
+        if (!ParseNumber(val, zoomAmount) || !std::isfinite(zoomAmount) ||
+            zoomAmount <= 0.0f) {
+          std::cerr << "Error: Invalid zoom value '" << val
+                    << "' (expected a positive number)\n";
           return false;
         }
-
+        zoomPreference = true;
         i++;
       } else {
         std::cerr << "Error: Zoom requires a numeric value" << "\n";
@@ -104,15 +108,10 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
       }
     } else if (arg == "-t" || arg == "--threads") {
       if (i + 1 < argv.size()) {
-        std::string tVal = argv[i + 1];
-        try {
-          threadCount = std::stoi(tVal);
-        } catch (const std::invalid_argument &e) {
-          std::cerr << "Error: Invalid thread count value. " << "\n";
-          std::cerr << tVal << " is not a number" << "\n";
-          return false;
-        } catch (const std::out_of_range &e) {
-          std::cerr << "Error: Thread count too large" << "\n";
+        const std::string &tVal = argv[i + 1];
+        if (!ParseNumber(tVal, threadCount) || threadCount == 0) {
+          std::cerr << "Error: Invalid thread count '" << tVal
+                    << "' (expected a positive integer)\n";
           return false;
         }
         i++;
