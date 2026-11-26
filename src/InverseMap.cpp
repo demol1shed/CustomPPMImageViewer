@@ -22,19 +22,23 @@ unsigned WorkersForRows(int screenHeight, unsigned requestedWorkers) {
 void InverseMap::RenderRows(const Image &source, ViewState vState,
                             Pixel *screenBuf, int screenWidth, int rowBegin,
                             int rowEnd) {
+  const int imgW = source.imageHeader.width;
+  const int imgH = source.imageHeader.height;
+  const bool validImage =
+      imgW > 0 && imgH > 0 &&
+      source.pixelData.size() >=
+          static_cast<size_t>(imgW) * static_cast<size_t>(imgH);
+
   BilinearLerper lerper;
   for (int y = rowBegin; y < rowEnd; y++) {
     for (int x = 0; x < screenWidth; x++) {
-      float u = (x - vState.offsetX) / vState.zoom;
-      float v = (y - vState.offsetY) / vState.zoom;
-      if (u >= 0 && u < source.imageHeader.width - 1 && v >= 0 &&
-          v < source.imageHeader.height - 1 && source.imageHeader.width > 2 &&
-          source.imageHeader.height > 2) {
+      const float u = (x - vState.offsetX) / vState.zoom;
+      const float v = (y - vState.offsetY) / vState.zoom;
+      if (validImage && u >= 0.0f && u < static_cast<float>(imgW) &&
+          v >= 0.0f && v < static_cast<float>(imgH)) {
         screenBuf[y * screenWidth + x] = lerper.SampleBilinear(&source, u, v);
-
       } else {
         screenBuf[y * screenWidth + x] = {0, 0, 0};
-        // draw background black if out of bounds
       }
     }
   }
