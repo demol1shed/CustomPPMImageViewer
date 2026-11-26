@@ -78,6 +78,7 @@ public:
   // parser uses fewer workers (or none) when `thresholds` says the input is
   // too small for threading to pay off.
   static std::optional<Image>
-  ParseFile(const std::string &filePath, uint threadCount, bool verbose = false,
+  ParseFile(const std::string &filePath, unsigned threadCount,
+            bool verbose = false,
             const ParallelThresholds &thresholds = ParallelThresholds{});
 };
