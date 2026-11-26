@@ -6,9 +6,10 @@
 #include <SDL2/SDL_video.h>
 #include <ViewController.h>
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <iostream>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -79,12 +80,23 @@ void PrintHelp() {
       << "  Esc or Q                            Quit\n";
 }
 
-bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
-             std::string &filePath, float &zoomAmount,
-             unsigned &threadCount) {
+// What main should do after the command line has been read.
+enum class ArgsResult { Run, Help, Error };
+
+// Parses all of `text` as a number; empty input, trailing characters and
+// out-of-range values are errors.
+template <typename T> bool ParseNumber(const std::string &text, T &out) {
+  const char *const end = text.data() + text.size();
+  const auto [ptr, ec] = std::from_chars(text.data(), end, out);
+  return ec == std::errc{} && ptr == end;
+}
+
+ArgsResult GetArgs(const std::vector<std::string> &argv, bool &verbose,
+                   std::string &filePath, float &zoomAmount,
+                   bool &zoomPreference, unsigned &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
-    return false;
+    return ArgsResult::Error;
   }
 
   for (size_t i = 1; i < argv.size(); i++) {
@@ -94,46 +106,44 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
       verbose = true;
     } else if (arg == "-h" || arg == "--help") {
       PrintHelp();
-      return false;
+      return ArgsResult::Help;
     } else if (arg == "-z" || arg == "--zoom") {
       if (i + 1 < argv.size()) {
-        std::string val = argv[i + 1];
-        try {
-          zoomAmount = std::stof(val);
-        } catch (const std::invalid_argument &e) {
-          std::cerr << "Error: Invalid zoom value. " << val
-                    << " is not a number" << "\n";
-          return false;
-        } catch (const std::out_of_range &e) {
-          std::cerr << "Error: Zoom value too large" << "\n";
-          return false;
+        const std::string &val = argv[i + 1];
+        if (!ParseNumber(val, zoomAmount) || !std::isfinite(zoomAmount) ||
+            zoomAmount <= 0.0f) {
+          std::cerr << "Error: Invalid zoom value '" << val
+                    << "' (expected a positive number)\n";
+          return ArgsResult::Error;
         }
-
+        zoomPreference = true;
         i++;
       } else {
         std::cerr << "Error: Zoom requires a numeric value" << "\n";
-        return false;
+        return ArgsResult::Error;
       }
     } else if (arg == "-t" || arg == "--threads") {
       if (i + 1 < argv.size()) {
-        std::string tVal = argv[i + 1];
-        try {
-          threadCount = std::stoi(tVal);
-        } catch (const std::invalid_argument &e) {
-          std::cerr << "Error: Invalid thread count value. " << "\n";
-          std::cerr << tVal << " is not a number" << "\n";
-          return false;
-        } catch (const std::out_of_range &e) {
-          std::cerr << "Error: Thread count too large" << "\n";
-          return false;
+        const std::string &tVal = argv[i + 1];
+        if (!ParseNumber(tVal, threadCount) || threadCount == 0) {
+          std::cerr << "Error: Invalid thread count '" << tVal
+                    << "' (expected a positive integer)\n";
+          return ArgsResult::Error;
         }
         i++;
       } else {
         std::cerr
             << "Error: Thread count requires a numeric value between 1 to 64"
             << "\n";
-        return false;
+        return ArgsResult::Error;
       }
+    } else if (!arg.empty() && arg[0] == '-') {
+      std::cerr << "Error: Unknown option '" << arg << "' (see --help)\n";
+      return ArgsResult::Error;
+    } else if (!filePath.empty()) {
+      std::cerr << "Error: Only one file path is accepted, got '" << filePath
+                << "' and '" << arg << "'\n";
+      return ArgsResult::Error;
     } else {
       filePath = arg;
     }
@@ -142,10 +152,10 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
   if (filePath.empty()) {
     std::cerr << "File on " << filePath << " is empty."
               << "\n";
-    return false;
+    return ArgsResult::Error;
   }
 
-  return true;
+  return ArgsResult::Run;
 }
 
 // Computes the zoom that fits the image inside the desktop work area (display
@@ -195,12 +205,12 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> args(argv, argv + argc);
 
-  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, threadCount)) {
-    return 1;
+  const ArgsResult argsResult =
+      GetArgs(args, verboseFlag, filePath, zoomAmount, zoomPreference,
+              threadCount);
+  if (argsResult != ArgsResult::Run) {
+    return argsResult == ArgsResult::Help ? 0 : 1;
   }
-
-  if (zoomAmount != DEFAULTZOOM)
-    zoomPreference = true;
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cerr << "Could not initialize SDL to get screen size" << "\n";
