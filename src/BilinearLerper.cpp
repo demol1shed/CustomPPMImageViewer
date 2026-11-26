@@ -29,10 +29,10 @@ int BilinearLerper::GiveFlattenedIndexOf(int w, int i, int j) {
   return (i * w) + j;
 }
 
-Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
-  const int width = source->imageHeader.width;
-  const int height = source->imageHeader.height;
-  if (width <= 0 || height <= 0 || source->pixelData.empty()) {
+Pixel BilinearLerper::SampleBilinear(const Image &source, float u, float v) {
+  const int width = source.imageHeader.width;
+  const int height = source.imageHeader.height;
+  if (width <= 0 || height <= 0 || source.pixelData.empty()) {
     return {0, 0, 0};
   }
 
@@ -47,12 +47,12 @@ Pixel BilinearLerper::SampleBilinear(const Image *source, float u, float v) {
   const float deltaX = std::clamp(u - static_cast<float>(x0), 0.0f, 1.0f);
   const float deltaY = std::clamp(v - static_cast<float>(y0), 0.0f, 1.0f);
 
-  const Pixel topLeft = source->pixelData[GiveFlattenedIndexOf(width, y0, x0)];
-  const Pixel topRight = source->pixelData[GiveFlattenedIndexOf(width, y0, x1)];
+  const Pixel topLeft = source.pixelData[GiveFlattenedIndexOf(width, y0, x0)];
+  const Pixel topRight = source.pixelData[GiveFlattenedIndexOf(width, y0, x1)];
   const Pixel bottomLeft =
-      source->pixelData[GiveFlattenedIndexOf(width, y1, x0)];
+      source.pixelData[GiveFlattenedIndexOf(width, y1, x0)];
   const Pixel bottomRight =
-      source->pixelData[GiveFlattenedIndexOf(width, y1, x1)];
+      source.pixelData[GiveFlattenedIndexOf(width, y1, x1)];
 
   const Pixel topColor = Lerp(topLeft, topRight, deltaX);
   const Pixel bottomColor = Lerp(bottomLeft, bottomRight, deltaX);

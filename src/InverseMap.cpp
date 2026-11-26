@@ -29,14 +29,14 @@ void InverseMap::RenderRows(const Image &source, ViewState vState,
       source.pixelData.size() >=
           static_cast<size_t>(imgW) * static_cast<size_t>(imgH);
 
-  BilinearLerper lerper;
   for (int y = rowBegin; y < rowEnd; y++) {
     for (int x = 0; x < screenWidth; x++) {
       const float u = (x - vState.offsetX) / vState.zoom;
       const float v = (y - vState.offsetY) / vState.zoom;
       if (validImage && u >= 0.0f && u < static_cast<float>(imgW) &&
           v >= 0.0f && v < static_cast<float>(imgH)) {
-        screenBuf[y * screenWidth + x] = lerper.SampleBilinear(&source, u, v);
+        screenBuf[y * screenWidth + x] =
+            BilinearLerper::SampleBilinear(source, u, v);
       } else {
         screenBuf[y * screenWidth + x] = {0, 0, 0};
       }
