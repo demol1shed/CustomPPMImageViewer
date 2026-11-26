@@ -78,8 +78,15 @@ bool ParseIntToken(const std::string &tok, int &out) {
   return true;
 }
 
-// Sentinel returned by WalkP3Tokens (parse mode) on a non-numeric token.
+// Sentinel returned by WalkP3Tokens (parse mode) on an invalid token.
 constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
+
+// Parses the P3 sample [begin, end). Rejects anything that is not a whole
+// integer in [0, maxVal], so nothing wraps modulo 256 when narrowed.
+bool ParseSample(const char *begin, const char *end, int maxVal, int &out) {
+  const std::from_chars_result res = std::from_chars(begin, end, out);
+  return res.ec == std::errc{} && res.ptr == end && out >= 0 && out <= maxVal;
+}
 
 // Single source of the P3 token walk, shared by counting (pass 1) and parsing
 // (pass 2) so the two passes can never disagree on which tokens a window owns.
@@ -88,10 +95,10 @@ constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
 // window [cs,ce) -- a token (maximal non-whitespace run) belongs to the window
 // holding its FIRST byte. If `out` is null, just counts. Otherwise from_chars
 // each owned token and writes the byte to out[outStart + k] for the k-th owned
-// token. Returns the owned-token count, or kWalkError on a non-numeric /
-// out-of-range token (parse mode only).
+// token. Returns the owned-token count, or kWalkError (parse mode only) on a
+// non-numeric token or a value outside [0, maxVal].
 std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
-                         std::size_t ce, std::uint8_t *out,
+                         std::size_t ce, int maxVal, std::uint8_t *out,
                          std::size_t outStart) {
   std::size_t p = cs;
   // If the window starts mid-token, that token's first byte is in an earlier
@@ -113,9 +120,7 @@ std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
       ++p;
     if (out) {
       int value = 0;
-      const std::from_chars_result res =
-          std::from_chars(tokBegin, base + p, value);
-      if (res.ec != std::errc{} || res.ptr != base + p)
+      if (!ParseSample(tokBegin, base + p, maxVal, value))
         return kWalkError;
       out[outStart + count] = static_cast<std::uint8_t>(value);
     }
@@ -130,7 +135,7 @@ void CountP3Range(const char *base, std::size_t N, std::size_t cs,
                   std::size_t ce, std::size_t *outCount, std::uint8_t *okFlag) {
   *okFlag = 0;
   try {
-    *outCount = WalkP3Tokens(base, N, cs, ce, nullptr, 0);
+    *outCount = WalkP3Tokens(base, N, cs, ce, 0, nullptr, 0); // count only
     *okFlag = 1;
   } catch (...) {
   }
@@ -138,17 +143,17 @@ void CountP3Range(const char *base, std::size_t N, std::size_t cs,
 
 // P3 pass-2 worker: parse the tokens owned by [cs,ce) and write them into the
 // disjoint slice flat[startValueIndex ..). Fails (okFlag stays 0) on a
-// non-numeric token, or if it did not write exactly expectedCount values (a
+// invalid token, or if it did not write exactly expectedCount values (a
 // guard against any pass-1/pass-2 walk divergence). No mutex: the buffer is
 // read-only and each worker writes a disjoint slice.
 void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
-                  std::size_t ce, std::size_t startValueIndex,
+                  std::size_t ce, int maxVal, std::size_t startValueIndex,
                   std::size_t expectedCount, std::uint8_t *flat,
                   std::uint8_t *okFlag) {
   *okFlag = 0;
   try {
     const std::size_t got =
-        WalkP3Tokens(base, N, cs, ce, flat, startValueIndex);
+        WalkP3Tokens(base, N, cs, ce, maxVal, flat, startValueIndex);
     if (got == kWalkError || got != expectedCount)
       return;
     *okFlag = 1;
@@ -300,7 +305,7 @@ unsigned Parser::WorkersForWorkload(std::size_t workloadBytes,
 std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
                                        std::size_t chunkStart,
                                        std::size_t chunkEnd) {
-  return WalkP3Tokens(base, totalBytes, chunkStart, chunkEnd, nullptr, 0);
+  return WalkP3Tokens(base, totalBytes, chunkStart, chunkEnd, 0, nullptr, 0);
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
@@ -544,8 +549,8 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
           ok2[i] = 1; // nothing to write
           return;
         }
-        ParseP3Range(base, n, ranges[i].start, ranges[i].end, starts[i],
-                     counts[i], flat, &ok2[i]);
+        ParseP3Range(base, n, ranges[i].start, ranges[i].end, maxValInt,
+                     starts[i], counts[i], flat, &ok2[i]);
       });
       for (std::uint8_t flag : ok2) {
         if (!flag) {
@@ -571,9 +576,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
         while (p < n && !IsWhitespace(base[p]))
           ++p;
         int value = 0;
-        const std::from_chars_result res =
-            std::from_chars(tokBegin, base + p, value);
-        if (res.ec != std::errc{} || res.ptr != base + p) {
+        if (!ParseSample(tokBegin, base + p, maxValInt, value)) {
           std::cerr << "Error: malformed P3 pixel value.\n";
           return std::nullopt;
         }
