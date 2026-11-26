@@ -4,6 +4,7 @@
 // and covering exactly [0, height) — so we assert those invariants directly.
 #include "TestFramework.h"
 #include <Parser.h>
+#include <climits>
 #include <vector>
 
 namespace {
@@ -36,6 +37,13 @@ TEST(RowRanges, InvariantsHoldAcrossManyCombinations) {
   const int threads[] = {1, 2, 3, 4, 8, 16};
   for (int h : heights)
     for (int t : threads)
+      checkPartition(h, t);
+}
+
+// i * height exceeds INT_MAX for these; the products must be 64-bit.
+TEST(RowRanges, HugeHeightsDoNotOverflow) {
+  for (int h : {1000000000, INT_MAX})
+    for (int t : {3, 7, 16, 64})
       checkPartition(h, t);
 }
 
