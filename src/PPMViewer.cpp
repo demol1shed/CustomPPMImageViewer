@@ -26,14 +26,19 @@ PPMViewer::PPMViewer(int width, int height) {
   pWin = SDL_CreateWindow("PPM Image Viewer", SDL_WINDOWPOS_CENTERED,
                           SDL_WINDOWPOS_CENTERED, this->width, this->height,
                           SDL_WINDOW_SHOWN);
-  if (pWin) {
-    pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_ACCELERATED);
+  if (!pWin)
+    return;
 
-    // STREAMING: the texture is re-uploaded on every pan/zoom redraw.
-    pTex = SDL_CreateTexture(pRen, SDL_PIXELFORMAT_RGB24,
-                             SDL_TEXTUREACCESS_STREAMING, this->width,
-                             this->height);
-  }
+  pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_ACCELERATED);
+  if (!pRen)
+    pRen = SDL_CreateRenderer(pWin, -1, SDL_RENDERER_SOFTWARE);
+  if (!pRen)
+    return;
+
+  // STREAMING: the texture is re-uploaded on every pan/zoom redraw.
+  pTex = SDL_CreateTexture(pRen, SDL_PIXELFORMAT_RGB24,
+                           SDL_TEXTUREACCESS_STREAMING, this->width,
+                           this->height);
 }
 
 PPMViewer::~PPMViewer() {
