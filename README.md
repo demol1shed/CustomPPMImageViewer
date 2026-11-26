@@ -6,7 +6,7 @@ This is a lightweight, hardware accelerated C++ application for parsing and view
 * **Hardware Acceleration:** Uses `SDL_Renderer` and `SDL_Texture` for efficient rendering.
 * **Smart Windowing:** Automatically resizes the window and the image according to the size of the image.
 * **Interactive Pan & Zoom:** Zoom around the cursor with the mouse wheel and drag to pan; redraws are resampled across all CPU cores.
-* **Multithreaded Loading:** Optionally reads raw (P6) pixel data across several threads to speed up loading large images.
+* **Multithreaded Loading:** Optionally loads both ASCII (P3) and raw (P6) pixel data across several threads to speed up large images.
 
 ## Dependencies
 To build and run this project, all that you'll need is a C++ compiler and the **SDL2 Development Library**.
@@ -37,7 +37,6 @@ You can use the Makefile for easy compilation.
 
 After cloning the repository, simply run
 ``` make ```. This will generate an executable with the name ```view```.
-If you are on an UNIX like system, then run ```chmod +x view```. Then you are ready to go.
 
 ## Usage
 ### Basic Usage
@@ -48,8 +47,18 @@ For further information you can use the `-h` flag.
 
 ```./view <path-to-your-image-file.ppm> [-h/--help]```
 
+### Verbose Output
+The `-v` flag prints the parsed header and how the pixel data was read.
+
+```./view <path-to-your-image-file.ppm> [-v/--verbose]```
+
+### Initial Zoom
+The `-z` flag sets the zoom level the viewer starts with (`1.0` is 100%, `2.0` is 200%). Without it, the image is scaled down to fit the screen if needed and is never scaled up.
+
+```./view <path-to-your-image-file.ppm> [-z/--zoom <factor>]```
+
 ### Multithreaded Loading
-For raw (P6) images you can spread the pixel reading across multiple threads with the `-t` flag. The count is clamped to the available cores and the number of image rows.
+For both ASCII (P3) and raw (P6) images you can spread loading across multiple threads with the `-t` flag. The count is clamped to the available cores and the number of image rows, and files too small to benefit are read on a single thread.
 
 ```./view <path-to-your-image-file.ppm> [-t/--threads <count>]```
 
@@ -66,8 +75,10 @@ The current zoom level is shown in the window title.
 ## Project Structure
 ```
 ├── include/               # Custom header files
-|   ├── BilinearLerper.h    # Declarations of the bilinear interpolation algorithm
+│   ├── BilinearLerper.h    # Declarations of the bilinear interpolation algorithm
 │   ├── Image.h             # Struct to hold image data
+│   ├── PPMHeader.h         # Struct to hold the parsed PPM header
+│   ├── RenderGeometry.h    # Window sizing math for the requested zoom
 │   ├── InverseMap.h        # Declarations of the inverse mapping algorithm
 │   ├── ViewState.h         # Struct to hold zooming and offsetting data
 │   ├── ViewController.h    # Declarations of the interactive zoom/pan math
@@ -83,8 +94,10 @@ The current zoom level is shown in the window title.
 │   ├── ViewController.cpp  # Implementations for the interactive zoom/pan math
 │   ├── ThreadPool.cpp      # Implementations for the shared fork-join thread pool
 │   └── PPMViewer.cpp       # Implementations for window creation and rendering the image
+├── tests/                # Unit tests and sample images
+├── bench/                # Parser load-time benchmark
 ├── Makefile              # Build configuration file
-└── README.md             # README file?
+└── README.md             # Project overview
 ```
 
 ## Known limitations
