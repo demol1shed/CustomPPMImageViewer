@@ -49,6 +49,29 @@ test: $(TEST_TARGET)
 $(TEST_TARGET): $(TEST_SRC) $(TESTED_SRC) $(HEADERS) $(wildcard $(TEST_DIR)/*.h)
 	$(CXX) $(CXXFLAGS) -I $(TEST_DIR) $(TEST_SRC) $(TESTED_SRC) -o $(TEST_TARGET)
 
+# --- Sanitizer builds ------------------------------------------------------
+# The same unit tests, built as separate binaries so they never mix with the
+# normal build. Any sanitizer report makes the run exit non-zero.
+ASAN_TARGET = run_tests_asan
+TSAN_TARGET = run_tests_tsan
+SAN_CXXFLAGS = -I include -I $(TEST_DIR) -Wall -Wextra -std=c++17 -O1 -g -pthread
+SAN_DEPS = $(TEST_SRC) $(TESTED_SRC) $(HEADERS) $(wildcard $(TEST_DIR)/*.h)
+
+test-asan: $(ASAN_TARGET)
+	@UBSAN_OPTIONS=halt_on_error=1 ./$(ASAN_TARGET)
+
+$(ASAN_TARGET): $(SAN_DEPS)
+	$(CXX) $(SAN_CXXFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer \
+	  $(TEST_SRC) $(TESTED_SRC) -o $@
+
+# setarch -R disables address randomisation for this run only: kernels with
+# high mmap entropy otherwise abort TSan with "unexpected memory mapping".
+test-tsan: $(TSAN_TARGET)
+	@setarch $$(uname -m) -R ./$(TSAN_TARGET)
+
+$(TSAN_TARGET): $(SAN_DEPS)
+	$(CXX) $(SAN_CXXFLAGS) -fsanitize=thread $(TEST_SRC) $(TESTED_SRC) -o $@
+
 # Headless end-to-end smoke check: run the real executable with SDL's dummy
 # video driver (no display needed), under a timeout safety cap. A signal exit
 # (>=128, e.g. a segfault) is a failure; a clean exit (0) or a timeout (124,
@@ -115,6 +138,7 @@ bench: $(BENCH_SRC) src/Parser.cpp src/ThreadPool.cpp $(HEADERS)
 	@./$(BENCH_TARGET)
 
 clean:
-	rm -f src/*.o src/*.d $(TARGET) $(TEST_TARGET) $(BENCH_TARGET)
+	rm -f src/*.o src/*.d $(TARGET) $(TEST_TARGET) $(BENCH_TARGET) \
+	  $(ASAN_TARGET) $(TSAN_TARGET)
 
-.PHONY: all test smoke bench clean
+.PHONY: all test test-asan test-tsan smoke bench clean
