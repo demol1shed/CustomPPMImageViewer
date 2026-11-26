@@ -73,6 +73,43 @@ TEST(InverseMap, TwoByTwoImageRendersFully) {
   }
 }
 
+TEST(InverseMap, OneByOneImageFillsItsScaledArea) {
+  Image src;
+  src.imageHeader.width = 1;
+  src.imageHeader.height = 1;
+  src.pixelData = {{10, 20, 30}};
+
+  for (int zoom : {1, 3}) {
+    ViewState vs;
+    vs.zoom = static_cast<float>(zoom);
+    vs.offsetX = 0.0f;
+    vs.offsetY = 0.0f;
+
+    std::vector<Pixel> screen(static_cast<size_t>(zoom * zoom));
+    InverseMap::ApplyInverseMap(src, vs, screen.data(), zoom, zoom);
+
+    for (const Pixel &p : screen) {
+      CHECK_PIXEL(p, 10, 20, 30);
+    }
+  }
+}
+
+TEST(InverseMap, EmptyImageRendersBlack) {
+  const Image src; // 0x0, no pixel data
+  ViewState vs;
+  vs.zoom = 1.0f;
+  vs.offsetX = 0.0f;
+  vs.offsetY = 0.0f;
+
+  // Sentinel pre-fill so an unwritten pixel cannot pass as black.
+  std::vector<Pixel> screen(4, Pixel{1, 2, 3});
+  InverseMap::ApplyInverseMap(src, vs, screen.data(), 2, 2);
+
+  for (const Pixel &p : screen) {
+    CHECK_PIXEL(p, 0, 0, 0);
+  }
+}
+
 // The threaded resampler splits the screen rows into bands; whatever the
 // worker count (including more workers than the frame can use), the result
 // must be byte-identical to the single-threaded render.

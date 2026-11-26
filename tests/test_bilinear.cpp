@@ -1,6 +1,6 @@
 // Unit tests for BilinearLerper::SampleBilinear. The fixture channels are even
 // numbers so a midpoint (delta = 0.5) blend lands on an exact integer, letting
-// us assert precise expected pixels despite the uint8_t truncation in Lerp().
+// us assert precise expected pixels independently of how Lerp() rounds.
 #include "SampleData.h"
 #include "TestFramework.h"
 #include <BilinearLerper.h>
@@ -36,4 +36,43 @@ TEST(Bilinear, CenterBlendsFourNeighbors) {
   Image img = sample::makeImage();
   BilinearLerper lerper;
   CHECK_PIXEL(lerper.SampleBilinear(&img, 0.5f, 0.5f), 40, 215, 20);
+}
+
+// The last column/row has no right/bottom neighbour: it samples itself.
+TEST(Bilinear, LastColumnAndRowReturnEdgePixel) {
+  Image img = sample::makeImage();
+  BilinearLerper lerper;
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 3.0f, 0.0f), 48, 207, 24);   // i = 3
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 0.0f, 3.0f), 192, 63, 96);   // i = 12
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 3.0f, 3.0f), 240, 15, 120);  // i = 15
+}
+
+TEST(Bilinear, OutOfRangeCoordinatesClampToEdge) {
+  Image img = sample::makeImage();
+  BilinearLerper lerper;
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 3.5f, 3.5f), 240, 15, 120);  // i = 15
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 6.3f, 0.0f), 48, 207, 24);   // i = 3
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 0.0f, 6.3f), 192, 63, 96);   // i = 12
+  CHECK_PIXEL(lerper.SampleBilinear(&img, -0.7f, -0.7f), 0, 255, 0);   // i = 0
+}
+
+TEST(Bilinear, OneByOneImageAlwaysReturnsItsPixel) {
+  Image img;
+  img.imageHeader.width = 1;
+  img.imageHeader.height = 1;
+  img.pixelData = {{10, 20, 30}};
+  BilinearLerper lerper;
+  for (float c : {-2.0f, 0.0f, 0.5f, 0.99f, 5.0f}) {
+    CHECK_PIXEL(lerper.SampleBilinear(&img, c, c), 10, 20, 30);
+  }
+}
+
+// 127.5 rounds to 128 (truncation would give 127).
+TEST(Bilinear, LerpRoundsToNearest) {
+  Image img;
+  img.imageHeader.width = 2;
+  img.imageHeader.height = 1;
+  img.pixelData = {{0, 0, 0}, {255, 255, 255}};
+  BilinearLerper lerper;
+  CHECK_PIXEL(lerper.SampleBilinear(&img, 0.5f, 0.0f), 128, 128, 128);
 }
