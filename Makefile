@@ -42,55 +42,41 @@ $(TEST_TARGET): $(TEST_SRC) $(TESTED_SRC) $(HEADERS) $(wildcard $(TEST_DIR)/*.h)
 	$(CXX) $(CXXFLAGS) -I $(TEST_DIR) $(TEST_SRC) $(TESTED_SRC) -o $(TEST_TARGET)
 
 # Headless end-to-end smoke check: run the real executable with SDL's dummy
-# video driver (no display needed), under a timeout safety cap. A signal exit
-# (>=128, e.g. a segfault) is a failure; a clean exit (0) or a timeout (124,
-# when a real display makes the app block) is fine. First pass also greps the
-# verbose output to confirm header parsing; second pass exercises the threaded
-# P6 path across several -t values; last pass runs the real test.ppm if present.
+# video driver (no display needed), where the software renderer draws the
+# frames. A healthy viewer stays in its event loop until timeout stops it (124),
+# so only 0 and 124 pass: error exits and signals (>=128, including 137 when a
+# hung process has to be killed) fail. The first pass also greps the verbose
+# output to confirm header parsing; the next ones exercise several -t values
+# and zoom levels; test.ppm runs if present.
 smoke: $(TARGET)
 	@echo "Running headless CLI smoke test (SDL dummy driver)..."
 	@fail=0; \
-	for f in $(TEST_DIR)/samples/4x4.ppm $(TEST_DIR)/samples/4x4_p6.ppm; do \
-	  out=$$(SDL_VIDEODRIVER=dummy timeout 5 ./$(TARGET) $$f -v 2>&1); \
+	run() { \
+	  out=$$(SDL_VIDEODRIVER=dummy timeout -k 3 2 ./$(TARGET) "$$@" </dev/null 2>&1); \
 	  code=$$?; \
-	  if [ $$code -ge 128 ]; then \
-	    echo "  [FAIL] $$f crashed with signal $$((code - 128))"; fail=1; \
-	  elif echo "$$out" | grep -q "Image size: 4, 4"; then \
-	    echo "  [OK]   $$f (no crash, parsed 4x4)"; \
+	  if [ $$code -eq 0 ] || [ $$code -eq 124 ]; then return 0; fi; \
+	  echo "  [FAIL] $$* (exit $$code)"; echo "$$out" | tail -n 3; fail=1; return 1; \
+	}; \
+	for f in $(TEST_DIR)/samples/4x4.ppm $(TEST_DIR)/samples/4x4_p6.ppm; do \
+	  run $$f -v || continue; \
+	  if echo "$$out" | grep -q "Image size: 4, 4"; then \
+	    echo "  [OK]   $$f (parsed 4x4)"; \
 	  else \
-	    echo "  [FAIL] $$f did not parse as expected (exit $$code)"; fail=1; \
+	    echo "  [FAIL] $$f did not parse as expected"; fail=1; \
 	  fi; \
 	done; \
 	for f in $(TEST_DIR)/samples/4x4_p6.ppm $(TEST_DIR)/samples/32x32_p6.ppm $(TEST_DIR)/samples/32x32.ppm; do \
 	  for t in 1 4 16; do \
-	    SDL_VIDEODRIVER=dummy timeout 5 ./$(TARGET) $$f -t $$t >/dev/null 2>&1; \
-	    code=$$?; \
-	    if [ $$code -ge 128 ]; then \
-	      echo "  [FAIL] $$f -t $$t crashed with signal $$((code - 128))"; fail=1; \
-	    else \
-	      echo "  [OK]   $$f -t $$t (no crash)"; \
-	    fi; \
+	    run $$f -t $$t && echo "  [OK]   $$f -t $$t"; \
 	  done; \
 	done; \
 	for f in $(TEST_DIR)/samples/4x4_p6.ppm $(TEST_DIR)/samples/32x32_p6.ppm; do \
 	  for z in 2.0 50; do \
-	    SDL_VIDEODRIVER=dummy timeout 5 ./$(TARGET) $$f -z $$z >/dev/null 2>&1; \
-	    code=$$?; \
-	    if [ $$code -ge 128 ]; then \
-	      echo "  [FAIL] $$f -z $$z crashed with signal $$((code - 128))"; fail=1; \
-	    else \
-	      echo "  [OK]   $$f -z $$z (no crash)"; \
-	    fi; \
+	    run $$f -z $$z && echo "  [OK]   $$f -z $$z"; \
 	  done; \
 	done; \
 	if [ -f test.ppm ]; then \
-	  SDL_VIDEODRIVER=dummy timeout 10 ./$(TARGET) test.ppm -t 16 >/dev/null 2>&1; \
-	  code=$$?; \
-	  if [ $$code -ge 128 ]; then \
-	    echo "  [FAIL] test.ppm -t 16 crashed with signal $$((code - 128))"; fail=1; \
-	  else \
-	    echo "  [OK]   test.ppm -t 16 (no crash)"; \
-	  fi; \
+	  run test.ppm -t 16 && echo "  [OK]   test.ppm -t 16"; \
 	fi; \
 	if [ $$fail -eq 0 ]; then echo "Smoke test passed."; \
 	else echo "Smoke test failed."; exit 1; fi
