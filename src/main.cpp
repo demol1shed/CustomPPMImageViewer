@@ -17,7 +17,7 @@
 constexpr float DEFAULTZOOM = 1.0f;
 constexpr int DEFAULTPADDING = 200;
 constexpr int DEFAULTARGCOUNT = 7;
-constexpr uint DEFAULTTHREADCOUNT = 1;
+constexpr unsigned DEFAULTTHREADCOUNT = 1;
 
 void PrintHelp() {
   const std::string red = "\033[31m";
@@ -80,7 +80,7 @@ template <typename T> bool ParseNumber(const std::string &text, T &out) {
 
 ArgsResult GetArgs(const std::vector<std::string> &argv, bool &verbose,
                    std::string &filePath, float &zoomAmount,
-                   bool &zoomPreference, uint &threadCount) {
+                   bool &zoomPreference, unsigned &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
     return ArgsResult::Error;
@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
 
   float zoomAmount = DEFAULTZOOM;
   bool zoomPreference = false;
-  uint threadCount = DEFAULTTHREADCOUNT;
+  unsigned threadCount = DEFAULTTHREADCOUNT;
 
   std::vector<std::string> args(argv, argv + argc);
 

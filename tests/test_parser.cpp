@@ -87,7 +87,7 @@ TEST(Parser, ParallelP6MatchesSerial) {
   CHECK_TRUE(serial.has_value());
   if (!serial)
     return;
-  for (uint threads : {2u, 3u, 4u, 8u}) {
+  for (unsigned threads : {2u, 3u, 4u, 8u}) {
     auto parallel = Parser::ParseFile(sample::binaryPath(), threads, false,
                                      ParallelThresholds::AlwaysParallel());
     CHECK_TRUE(parallel.has_value());
@@ -110,7 +110,7 @@ TEST(Parser, ParallelP3MatchesSerial) {
   CHECK_TRUE(serial.has_value());
   if (!serial)
     return;
-  for (uint threads : {2u, 3u, 4u, 8u}) {
+  for (unsigned threads : {2u, 3u, 4u, 8u}) {
     auto parallel = Parser::ParseFile(sample::asciiPath(), threads, false,
                                      ParallelThresholds::AlwaysParallel());
     CHECK_TRUE(parallel.has_value());
