@@ -4,9 +4,9 @@
 
 class BilinearLerper {
 private:
-  Pixel Lerp(Pixel a, Pixel b, float d);
-  int GiveFlattenedIndexOf(int w, int i, int j); // w being column count
+  static Pixel Lerp(Pixel a, Pixel b, float d);
+  static int GiveFlattenedIndexOf(int w, int i, int j); // w being column count
 
 public:
-  Pixel SampleBilinear(const Image *source, float u, float v);
+  static Pixel SampleBilinear(const Image &source, float u, float v);
 };

@@ -8,10 +8,9 @@
 #include <ViewState.h>
 #include <vector>
 
-// zoom = 1, no offset: each in-bounds screen pixel maps to its source pixel.
-// The sampler guard (u < width-1, v < height-1) leaves the last column/row out
-// of range, so those screen pixels are rendered black.
-TEST(InverseMap, IdentityZoomCopiesInBoundsBlacksEdges) {
+// zoom = 1, no offset: every screen pixel maps to its source pixel, including
+// the last column and row.
+TEST(InverseMap, IdentityZoomCopiesWholeImage) {
   Image src = sample::makeImage();
   ViewState vs;
   vs.zoom = 1.0f;
@@ -23,16 +22,9 @@ TEST(InverseMap, IdentityZoomCopiesInBoundsBlacksEdges) {
   std::vector<Pixel> screen(static_cast<size_t>(w * h));
   InverseMap::ApplyInverseMap(src, vs, screen.data(), w, h);
 
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      const Pixel got = screen[static_cast<size_t>(y * w + x)];
-      if (x < w - 1 && y < h - 1) {
-        const Pixel e = sample::expectedPixel(y * w + x);
-        CHECK_PIXEL(got, e.r, e.g, e.b);
-      } else {
-        CHECK_PIXEL(got, 0, 0, 0); // out of sampler range -> black
-      }
-    }
+  for (int i = 0; i < w * h; ++i) {
+    const Pixel e = sample::expectedPixel(i);
+    CHECK_PIXEL(screen[static_cast<size_t>(i)], e.r, e.g, e.b);
   }
 }
 
@@ -56,9 +48,8 @@ TEST(InverseMap, ZoomTwoUpscalesThroughBilinear) {
   CHECK_PIXEL(screen[1 * w + 0], 32, 223, 16); // (0.0,0.5) -> blend i0,i4
 }
 
-// A tiny (< 3px) image trips the guard's width/height > 2 clause, so the whole
-// screen must come back black rather than reading out of bounds.
-TEST(InverseMap, DegenerateImageRendersBlack) {
+// Images smaller than 3px are valid and must be drawn, not blacked out.
+TEST(InverseMap, TwoByTwoImageRendersFully) {
   Image src;
   src.imageHeader.width = 2;
   src.imageHeader.height = 2;
@@ -75,6 +66,44 @@ TEST(InverseMap, DegenerateImageRendersBlack) {
   const int h = 2;
   std::vector<Pixel> screen(static_cast<size_t>(w * h));
   InverseMap::ApplyInverseMap(src, vs, screen.data(), w, h);
+
+  for (size_t i = 0; i < screen.size(); ++i) {
+    const Pixel e = src.pixelData[i];
+    CHECK_PIXEL(screen[i], e.r, e.g, e.b);
+  }
+}
+
+TEST(InverseMap, OneByOneImageFillsItsScaledArea) {
+  Image src;
+  src.imageHeader.width = 1;
+  src.imageHeader.height = 1;
+  src.pixelData = {{10, 20, 30}};
+
+  for (int zoom : {1, 3}) {
+    ViewState vs;
+    vs.zoom = static_cast<float>(zoom);
+    vs.offsetX = 0.0f;
+    vs.offsetY = 0.0f;
+
+    std::vector<Pixel> screen(static_cast<size_t>(zoom * zoom));
+    InverseMap::ApplyInverseMap(src, vs, screen.data(), zoom, zoom);
+
+    for (const Pixel &p : screen) {
+      CHECK_PIXEL(p, 10, 20, 30);
+    }
+  }
+}
+
+TEST(InverseMap, EmptyImageRendersBlack) {
+  const Image src; // 0x0, no pixel data
+  ViewState vs;
+  vs.zoom = 1.0f;
+  vs.offsetX = 0.0f;
+  vs.offsetY = 0.0f;
+
+  // Sentinel pre-fill so an unwritten pixel cannot pass as black.
+  std::vector<Pixel> screen(4, Pixel{1, 2, 3});
+  InverseMap::ApplyInverseMap(src, vs, screen.data(), 2, 2);
 
   for (const Pixel &p : screen) {
     CHECK_PIXEL(p, 0, 0, 0);
