@@ -4,6 +4,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -27,8 +28,96 @@ inline bool IsWhitespace(char c) {
          c == '\f';
 }
 
-// Sentinel returned by WalkP3Tokens (parse mode) on a non-numeric token.
+bool ReadHeaderToken(std::istream &in, std::string &out) {
+  out.clear();
+  char c = 0;
+
+  while (in.get(c)) {
+    if (IsWhitespace(c)) {
+      continue;
+    }
+    if (c == '#') {
+      while (in.get(c) && c != '\n') {
+      }
+      continue;
+    }
+    out.push_back(c);
+    break;
+  }
+
+  if (out.empty()) {
+    return false;
+  }
+
+  while (true) {
+    const int next = in.peek();
+    if (next == std::char_traits<char>::eof()) {
+      break;
+    }
+    const char ch = static_cast<char>(next);
+    if (IsWhitespace(ch) || ch == '#') {
+      break;
+    }
+    in.get(c);
+    out.push_back(c);
+  }
+  return true;
+}
+
+bool ParseIntToken(const std::string &tok, int &out) {
+  if (tok.empty()) {
+    return false;
+  }
+  const char *begin = tok.data();
+  const char *end = begin + tok.size();
+  int value = 0;
+  const std::from_chars_result res = std::from_chars(begin, end, value);
+  if (res.ec != std::errc{} || res.ptr != end) {
+    return false;
+  }
+  out = value;
+  return true;
+}
+
+// Sentinel returned by WalkP3Tokens (parse mode) on an invalid token.
 constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
+
+// Overwrites every "# ... \n" comment in the P3 value region with spaces. Done
+// once before the region is split, so the token walk (and its window ownership
+// rule) never sees a comment, even one that spans a window boundary.
+void BlankComments(char *data, std::size_t size) {
+  char *const end = data + size;
+  char *p = data;
+  while (p < end) {
+    p = static_cast<char *>(
+        std::memchr(p, '#', static_cast<std::size_t>(end - p)));
+    if (!p)
+      return;
+    while (p < end && *p != '\n')
+      *p++ = ' ';
+  }
+}
+
+// Rescales `count` channel bytes from [0, maxVal] to [0, 255], rounding to
+// nearest. Bytes above maxVal (possible only in binary P6) saturate at 255.
+void ScaleToFullRange(std::uint8_t *data, std::size_t count, int maxVal) {
+  std::uint8_t lut[256];
+  for (int v = 0; v < 256; ++v) {
+    const int clamped = v < maxVal ? v : maxVal;
+    lut[v] = static_cast<std::uint8_t>((clamped * 255 + maxVal / 2) / maxVal);
+  }
+  // shortcut: serial pass, move onto ThreadPool if large low-maxVal files
+  // become common.
+  for (std::size_t i = 0; i < count; ++i)
+    data[i] = lut[data[i]];
+}
+
+// Parses the P3 sample [begin, end). Rejects anything that is not a whole
+// integer in [0, maxVal], so nothing wraps modulo 256 when narrowed.
+bool ParseSample(const char *begin, const char *end, int maxVal, int &out) {
+  const std::from_chars_result res = std::from_chars(begin, end, out);
+  return res.ec == std::errc{} && res.ptr == end && out >= 0 && out <= maxVal;
+}
 
 // Single source of the P3 token walk, shared by counting (pass 1) and parsing
 // (pass 2) so the two passes can never disagree on which tokens a window owns.
@@ -37,10 +126,10 @@ constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
 // window [cs,ce) -- a token (maximal non-whitespace run) belongs to the window
 // holding its FIRST byte. If `out` is null, just counts. Otherwise from_chars
 // each owned token and writes the byte to out[outStart + k] for the k-th owned
-// token. Returns the owned-token count, or kWalkError on a non-numeric /
-// out-of-range token (parse mode only).
+// token. Returns the owned-token count, or kWalkError (parse mode only) on a
+// non-numeric token or a value outside [0, maxVal].
 std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
-                         std::size_t ce, std::uint8_t *out,
+                         std::size_t ce, int maxVal, std::uint8_t *out,
                          std::size_t outStart) {
   std::size_t p = cs;
   // If the window starts mid-token, that token's first byte is in an earlier
@@ -57,13 +146,12 @@ std::size_t WalkP3Tokens(const char *base, std::size_t N, std::size_t cs,
     if (p >= N || p >= ce) // next token-start belongs to a later window
       break;
     const char *tokBegin = base + p;
-    while (p < N && !IsWhitespace(base[p])) // advance past token end (may pass ce)
+    while (p < N &&
+           !IsWhitespace(base[p])) // advance past token end (may pass ce)
       ++p;
     if (out) {
       int value = 0;
-      const std::from_chars_result res =
-          std::from_chars(tokBegin, base + p, value);
-      if (res.ec != std::errc{} || res.ptr != base + p)
+      if (!ParseSample(tokBegin, base + p, maxVal, value))
         return kWalkError;
       out[outStart + count] = static_cast<std::uint8_t>(value);
     }
@@ -78,7 +166,7 @@ void CountP3Range(const char *base, std::size_t N, std::size_t cs,
                   std::size_t ce, std::size_t *outCount, std::uint8_t *okFlag) {
   *okFlag = 0;
   try {
-    *outCount = WalkP3Tokens(base, N, cs, ce, nullptr, 0);
+    *outCount = WalkP3Tokens(base, N, cs, ce, 0, nullptr, 0); // count only
     *okFlag = 1;
   } catch (...) {
   }
@@ -86,16 +174,17 @@ void CountP3Range(const char *base, std::size_t N, std::size_t cs,
 
 // P3 pass-2 worker: parse the tokens owned by [cs,ce) and write them into the
 // disjoint slice flat[startValueIndex ..). Fails (okFlag stays 0) on a
-// non-numeric token, or if it did not write exactly expectedCount values (a
+// invalid token, or if it did not write exactly expectedCount values (a
 // guard against any pass-1/pass-2 walk divergence). No mutex: the buffer is
 // read-only and each worker writes a disjoint slice.
 void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
-                  std::size_t ce, std::size_t startValueIndex,
+                  std::size_t ce, int maxVal, std::size_t startValueIndex,
                   std::size_t expectedCount, std::uint8_t *flat,
                   std::uint8_t *okFlag) {
   *okFlag = 0;
   try {
-    const std::size_t got = WalkP3Tokens(base, N, cs, ce, flat, startValueIndex);
+    const std::size_t got =
+        WalkP3Tokens(base, N, cs, ce, maxVal, flat, startValueIndex);
     if (got == kWalkError || got != expectedCount)
       return;
     *okFlag = 1;
@@ -201,9 +290,12 @@ std::vector<RowRange> Parser::ComputeRowRanges(int height, int threadCount) {
   // Because endRow(i) == startRow(i+1) by construction, adjacent ranges
   // telescope: no gaps, no overlaps. startRow(0) == 0 and
   // endRow(threadCount-1) == height, so the union is exactly [0, height).
+  // 64-bit products: i * height overflows int (UB) on very tall inputs. The
+  // quotient is at most height, so narrowing back is lossless.
   for (int i = 0; i < threadCount; ++i) {
-    int startRow = (i * height) / threadCount;
-    int endRow = ((i + 1) * height) / threadCount;
+    const long long index = i;
+    int startRow = static_cast<int>(index * height / threadCount);
+    int endRow = static_cast<int>((index + 1) * height / threadCount);
     ranges.push_back({startRow, endRow});
   }
   return ranges;
@@ -218,7 +310,8 @@ std::vector<ByteRange> Parser::ComputeByteRanges(std::size_t totalBytes,
   // Balanced byte split; cast i to size_t before i*totalBytes so the product
   // is computed in size_t (totalBytes can be large for a big P3 file).
   for (int i = 0; i < threadCount; ++i) {
-    std::size_t start = (static_cast<std::size_t>(i) * totalBytes) / threadCount;
+    std::size_t start =
+        (static_cast<std::size_t>(i) * totalBytes) / threadCount;
     std::size_t end =
         (static_cast<std::size_t>(i + 1) * totalBytes) / threadCount;
     ranges.push_back({start, end});
@@ -243,7 +336,7 @@ unsigned Parser::WorkersForWorkload(std::size_t workloadBytes,
 std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
                                        std::size_t chunkStart,
                                        std::size_t chunkEnd) {
-  return WalkP3Tokens(base, totalBytes, chunkStart, chunkEnd, nullptr, 0);
+  return WalkP3Tokens(base, totalBytes, chunkStart, chunkEnd, 0, nullptr, 0);
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
@@ -255,75 +348,80 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     return std::nullopt;
   }
 
-  Image image;
-  std::string line;
-  std::stringstream ss;
+  // Pixel ceiling for overflow safety (~256MP -> ~768MiB)
+  constexpr std::size_t kMaxPixels = 256ull * 1024ull * 1024ull;
 
-  auto GetNextValidLine = [&]() { // take all vars by reference
-    while (std::getline(file, line)) {
-      size_t commentPos = line.find("#");
-      if (commentPos != std::string::npos) {
-        line = line.substr(0, commentPos);
-      }
+  std::string typeTok;
+  std::string wTok;
+  std::string hTok;
+  std::string maxValTok;
 
-      if (line.empty() ||
-          line.find_first_not_of(" \t\r\n") == std::string::npos)
-        continue;
-
-      return true;
-    }
-    return false;
-  };
-
-  // getting ppm type
-  if (!GetNextValidLine())
+  if (!ReadHeaderToken(file, typeTok) || !ReadHeaderToken(file, wTok) ||
+      !ReadHeaderToken(file, hTok) || !ReadHeaderToken(file, maxValTok)) {
+    std::cerr << "Error: incomplete PPM header. \n";
     return std::nullopt;
-  ss.clear();
-  ss.str(line);
-  ss >> image.imageHeader.ppmType;
-
-  // getting width and height
-  int w = -1,
-      h = -1; // do this to move until a valid width/height value is found
-  while (w == -1 || h == -1) {
-    if (ss.eof()) {
-      if (!GetNextValidLine())
-        return std::nullopt;
-      ss.clear();
-      ss.str(line);
-    }
-    if (w == -1)
-      ss >> w;
-    // width and height may be in differnt lines
-    if (ss.eof() && h == -1) {
-      if (!GetNextValidLine())
-        return std::nullopt;
-      ss.clear();
-      ss.str(line);
-    }
-    if (h == -1)
-      ss >> h;
   }
 
+  if (typeTok != "P3" && typeTok != "P6") {
+    std::cerr << "Error: unsupported PPM type '" << typeTok << "'\n";
+    return std::nullopt;
+  }
+
+  int w = 0;
+  int h = 0;
+  int maxValInt = 0;
+
+  if (!ParseIntToken(wTok, w) || !ParseIntToken(hTok, h) ||
+      !ParseIntToken(maxValTok, maxValInt)) {
+    std::cerr << "Error: invalid numeric value in PPM header. \n";
+    return std::nullopt;
+  }
+
+  if (w <= 0 || h <= 0) {
+    std::cerr << "Error: invalid PPM dimensions (" << w << "x" << h << ").\n";
+    return std::nullopt;
+  }
+
+  if (static_cast<std::size_t>(w) > kMaxPixels / static_cast<std::size_t>(h)) {
+    std::cerr << "Error: PPM image exceeds maximum supported pixel count.\n";
+    return std::nullopt;
+  }
+
+  if (maxValInt <= 0 || maxValInt > 255) {
+    std::cerr << "Error: unsupported maxVal " << maxValInt
+              << " (expected 1..255).\n";
+    return std::nullopt;
+  }
+
+  char sep = 0;
+
+  if (!file.get(sep)) {
+    std::cerr << "Error: unexpected EOF after maxVal.\n";
+    return std::nullopt;
+  }
+  if (sep == '#') {
+    bool foundNewline = false;
+    while (file.get(sep)) {
+      if (sep == '\n') {
+        foundNewline = true;
+        break;
+      }
+    }
+    if (!foundNewline) {
+      std::cerr << "Error: unterminated comment after maxVal.\n";
+      return std::nullopt;
+    }
+  } else if (!IsWhitespace(sep)) {
+    std::cerr << "Error: missing whitespace after maxVal.\n";
+    return std::nullopt;
+  }
+
+  Image image;
+  image.imageHeader.ppmType = typeTok;
   image.imageHeader.width = w;
   image.imageHeader.height = h;
-
-  // getting maxVal
-  int maxValInt = 0;
-  if (ss.eof()) {
-    if (!GetNextValidLine())
-      return std::nullopt;
-    ss.clear();
-    ss.str(line);
-  }
-
-  ss >> maxValInt;
-  if (maxValInt > 255) {
-    std::cerr << "Error: 16 bit ppms are not supported. MaxVal is " << maxValInt
-              << "\n";
-    return std::nullopt;
-  }
   image.imageHeader.maxVal = static_cast<uint8_t>(maxValInt);
+
   if (verbose) {
     std::cout << "File pre-parsing has been completed.\nPPM image type: "
               << image.imageHeader.ppmType
@@ -350,9 +448,13 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     const bool parallel = effectiveThreads >= 2;
 
     if (parallel) {
-      // The header getline loop left the file cursor exactly at the first
-      // pixel byte; workers seek relative to this offset.
+      // The header parse consumed exactly one separator after maxVal, so the
+      // cursor is on the first pixel byte; workers seek relative to it.
       const std::streamoff dataStart = file.tellg();
+      if (dataStart < 0) {
+        std::cerr << "Error: could not locate P6 pixel data.\n";
+        return std::nullopt;
+      }
 
       std::vector<RowRange> ranges = ComputeRowRanges(height, effectiveThreads);
       // One success byte per worker. MUST be std::uint8_t, not
@@ -414,6 +516,11 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     const size_t regionBytes = static_cast<size_t>(endPos - dataStart);
     std::vector<char> buf(regionBytes);
     file.read(buf.data(), static_cast<std::streamsize>(regionBytes));
+    if (file.gcount() != static_cast<std::streamsize>(regionBytes)) {
+      std::cerr << "Error: could not read P3 pixel data.\n";
+      return std::nullopt;
+    }
+    BlankComments(buf.data(), buf.size());
 
     std::uint8_t *flat =
         reinterpret_cast<std::uint8_t *>(image.pixelData.data());
@@ -474,8 +581,8 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
           ok2[i] = 1; // nothing to write
           return;
         }
-        ParseP3Range(base, n, ranges[i].start, ranges[i].end, starts[i],
-                     counts[i], flat, &ok2[i]);
+        ParseP3Range(base, n, ranges[i].start, ranges[i].end, maxValInt,
+                     starts[i], counts[i], flat, &ok2[i]);
       });
       for (std::uint8_t flag : ok2) {
         if (!flag) {
@@ -501,9 +608,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
         while (p < n && !IsWhitespace(base[p]))
           ++p;
         int value = 0;
-        const std::from_chars_result res =
-            std::from_chars(tokBegin, base + p, value);
-        if (res.ec != std::errc{} || res.ptr != base + p) {
+        if (!ParseSample(tokBegin, base + p, maxValInt, value)) {
           std::cerr << "Error: malformed P3 pixel value.\n";
           return std::nullopt;
         }
@@ -519,6 +624,14 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       if (verbose)
         std::cout << "ASCII P3 data read (serial).\n";
     }
+  }
+
+  // Pixels are always full range from here on; imageHeader.maxVal keeps the
+  // value declared by the file.
+  if (maxValInt < 255) {
+    ScaleToFullRange(
+        reinterpret_cast<std::uint8_t *>(image.pixelData.data()),
+        totalPixels * sizeof(Pixel), maxValInt);
   }
 
   return image;

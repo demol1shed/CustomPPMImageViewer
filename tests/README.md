@@ -12,9 +12,9 @@ tests assert on exact pixel values instead.
 | `TestFramework.h` | Tiny header-only test harness (`TEST`, `CHECK_*`, runner). No external libs. |
 | `SampleData.h` | Shared fixture definitions (4x4 + 32x32) + in-memory image builder. |
 | `test_main.cpp` | Runner entry point (`testing::runAll()`). |
-| `test_parser.cpp` | `Parser::ParseFile` — P3/P6 headers, pixels, cross-format agreement, missing file, parallel-vs-serial on 4x4. |
+| `test_parser.cpp` | `Parser::ParseFile` — P3/P6 headers, pixels, cross-format agreement, missing file, parallel-vs-serial on 4x4, rejected headers, low-`maxVal` scaling, P3 comments and sample ranges. |
 | `test_parser_mt.cpp` | Multithreaded P6 and P3 decode on the 32x32 fixtures — parallel equals serial and the known formula across many thread counts. |
-| `test_rowranges.cpp` | `Parser::ComputeRowRanges` — the P6 row partition is gap-free, non-overlapping, and covers exactly `[0, height)`. |
+| `test_rowranges.cpp` | `Parser::ComputeRowRanges` — the P6 row partition is gap-free, non-overlapping, and covers exactly `[0, height)`, including very large heights. |
 | `test_byteranges.cpp` | `Parser::ComputeByteRanges` + `CountTokensInRange` — the P3 byte partition tiles the region and each token is owned by exactly one window. |
 | `test_rendergeometry.cpp` | `ComputeWindowSize` — the zoom window is clamped to the display (no pitch/stride shear). |
 | `test_bilinear.cpp` | `BilinearLerper::SampleBilinear` — exact pixels and blended midpoints. |
