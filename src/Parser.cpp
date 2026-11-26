@@ -409,9 +409,13 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     const bool parallel = effectiveThreads >= 2;
 
     if (parallel) {
-      // The header getline loop left the file cursor exactly at the first
-      // pixel byte; workers seek relative to this offset.
+      // The header parse consumed exactly one separator after maxVal, so the
+      // cursor is on the first pixel byte; workers seek relative to it.
       const std::streamoff dataStart = file.tellg();
+      if (dataStart < 0) {
+        std::cerr << "Error: could not locate P6 pixel data.\n";
+        return std::nullopt;
+      }
 
       std::vector<RowRange> ranges = ComputeRowRanges(height, effectiveThreads);
       // One success byte per worker. MUST be std::uint8_t, not
@@ -473,6 +477,10 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
     const size_t regionBytes = static_cast<size_t>(endPos - dataStart);
     std::vector<char> buf(regionBytes);
     file.read(buf.data(), static_cast<std::streamsize>(regionBytes));
+    if (file.gcount() != static_cast<std::streamsize>(regionBytes)) {
+      std::cerr << "Error: could not read P3 pixel data.\n";
+      return std::nullopt;
+    }
 
     std::uint8_t *flat =
         reinterpret_cast<std::uint8_t *>(image.pixelData.data());
