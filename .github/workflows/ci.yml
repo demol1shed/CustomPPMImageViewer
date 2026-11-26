@@ -17,6 +17,14 @@ jobs:
 
       - name: Install SDL2
         run: |
+          # The runner image ships Microsoft's apt sources. Nothing here installs
+          # from them, but an outage there fails "apt-get update".
+          sources=$(grep -rl packages.microsoft.com \
+            /etc/apt/sources.list /etc/apt/sources.list.d || true)
+          if [ -n "$sources" ]; then
+            echo "Removing apt sources:" $sources
+            sudo rm -f $sources
+          fi
           sudo apt-get update
           sudo apt-get install -y libsdl2-dev
 
