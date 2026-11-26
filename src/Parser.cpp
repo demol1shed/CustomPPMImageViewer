@@ -98,6 +98,20 @@ void BlankComments(char *data, std::size_t size) {
   }
 }
 
+// Rescales `count` channel bytes from [0, maxVal] to [0, 255], rounding to
+// nearest. Bytes above maxVal (possible only in binary P6) saturate at 255.
+void ScaleToFullRange(std::uint8_t *data, std::size_t count, int maxVal) {
+  std::uint8_t lut[256];
+  for (int v = 0; v < 256; ++v) {
+    const int clamped = v < maxVal ? v : maxVal;
+    lut[v] = static_cast<std::uint8_t>((clamped * 255 + maxVal / 2) / maxVal);
+  }
+  // shortcut: serial pass, move onto ThreadPool if large low-maxVal files
+  // become common.
+  for (std::size_t i = 0; i < count; ++i)
+    data[i] = lut[data[i]];
+}
+
 // Parses the P3 sample [begin, end). Rejects anything that is not a whole
 // integer in [0, maxVal], so nothing wraps modulo 256 when narrowed.
 bool ParseSample(const char *begin, const char *end, int maxVal, int &out) {
@@ -610,6 +624,14 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       if (verbose)
         std::cout << "ASCII P3 data read (serial).\n";
     }
+  }
+
+  // Pixels are always full range from here on; imageHeader.maxVal keeps the
+  // value declared by the file.
+  if (maxValInt < 255) {
+    ScaleToFullRange(
+        reinterpret_cast<std::uint8_t *>(image.pixelData.data()),
+        totalPixels * sizeof(Pixel), maxValInt);
   }
 
   return image;
