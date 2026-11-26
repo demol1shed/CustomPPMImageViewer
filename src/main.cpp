@@ -67,6 +67,9 @@ void PrintHelp() {
       << "  Esc or Q                            Quit\n";
 }
 
+// What main should do after the command line has been read.
+enum class ArgsResult { Run, Help, Error };
+
 // Parses all of `text` as a number; empty input, trailing characters and
 // out-of-range values are errors.
 template <typename T> bool ParseNumber(const std::string &text, T &out) {
@@ -75,12 +78,12 @@ template <typename T> bool ParseNumber(const std::string &text, T &out) {
   return ec == std::errc{} && ptr == end;
 }
 
-bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
-             std::string &filePath, float &zoomAmount, bool &zoomPreference,
-             uint &threadCount) {
+ArgsResult GetArgs(const std::vector<std::string> &argv, bool &verbose,
+                   std::string &filePath, float &zoomAmount,
+                   bool &zoomPreference, uint &threadCount) {
   if (argv.size() > DEFAULTARGCOUNT) {
     PrintHelp();
-    return false;
+    return ArgsResult::Error;
   }
 
   for (size_t i = 1; i < argv.size(); i++) {
@@ -90,7 +93,7 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
       verbose = true;
     } else if (arg == "-h" || arg == "--help") {
       PrintHelp();
-      return false;
+      return ArgsResult::Help;
     } else if (arg == "-z" || arg == "--zoom") {
       if (i + 1 < argv.size()) {
         const std::string &val = argv[i + 1];
@@ -98,13 +101,13 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
             zoomAmount <= 0.0f) {
           std::cerr << "Error: Invalid zoom value '" << val
                     << "' (expected a positive number)\n";
-          return false;
+          return ArgsResult::Error;
         }
         zoomPreference = true;
         i++;
       } else {
         std::cerr << "Error: Zoom requires a numeric value" << "\n";
-        return false;
+        return ArgsResult::Error;
       }
     } else if (arg == "-t" || arg == "--threads") {
       if (i + 1 < argv.size()) {
@@ -112,22 +115,22 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
         if (!ParseNumber(tVal, threadCount) || threadCount == 0) {
           std::cerr << "Error: Invalid thread count '" << tVal
                     << "' (expected a positive integer)\n";
-          return false;
+          return ArgsResult::Error;
         }
         i++;
       } else {
         std::cerr
             << "Error: Thread count requires a numeric value between 1 to 64"
             << "\n";
-        return false;
+        return ArgsResult::Error;
       }
     } else if (!arg.empty() && arg[0] == '-') {
       std::cerr << "Error: Unknown option '" << arg << "' (see --help)\n";
-      return false;
+      return ArgsResult::Error;
     } else if (!filePath.empty()) {
       std::cerr << "Error: Only one file path is accepted, got '" << filePath
                 << "' and '" << arg << "'\n";
-      return false;
+      return ArgsResult::Error;
     } else {
       filePath = arg;
     }
@@ -136,10 +139,10 @@ bool GetArgs(const std::vector<std::string> &argv, bool &verbose,
   if (filePath.empty()) {
     std::cerr << "File on " << filePath << " is empty."
               << "\n";
-    return false;
+    return ArgsResult::Error;
   }
 
-  return true;
+  return ArgsResult::Run;
 }
 
 // Computes the zoom that fits the image inside the desktop work area (display
@@ -189,9 +192,11 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> args(argv, argv + argc);
 
-  if (!GetArgs(args, verboseFlag, filePath, zoomAmount, zoomPreference,
-               threadCount)) {
-    return 1;
+  const ArgsResult argsResult =
+      GetArgs(args, verboseFlag, filePath, zoomAmount, zoomPreference,
+              threadCount);
+  if (argsResult != ArgsResult::Run) {
+    return argsResult == ArgsResult::Help ? 0 : 1;
   }
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
