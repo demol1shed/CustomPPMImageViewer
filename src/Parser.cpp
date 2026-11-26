@@ -4,6 +4,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -80,6 +81,22 @@ bool ParseIntToken(const std::string &tok, int &out) {
 
 // Sentinel returned by WalkP3Tokens (parse mode) on an invalid token.
 constexpr std::size_t kWalkError = static_cast<std::size_t>(-1);
+
+// Overwrites every "# ... \n" comment in the P3 value region with spaces. Done
+// once before the region is split, so the token walk (and its window ownership
+// rule) never sees a comment, even one that spans a window boundary.
+void BlankComments(char *data, std::size_t size) {
+  char *const end = data + size;
+  char *p = data;
+  while (p < end) {
+    p = static_cast<char *>(
+        std::memchr(p, '#', static_cast<std::size_t>(end - p)));
+    if (!p)
+      return;
+    while (p < end && *p != '\n')
+      *p++ = ' ';
+  }
+}
 
 // Parses the P3 sample [begin, end). Rejects anything that is not a whole
 // integer in [0, maxVal], so nothing wraps modulo 256 when narrowed.
@@ -489,6 +506,7 @@ std::optional<Image> Parser::ParseFile(const std::string &filePath,
       std::cerr << "Error: could not read P3 pixel data.\n";
       return std::nullopt;
     }
+    BlankComments(buf.data(), buf.size());
 
     std::uint8_t *flat =
         reinterpret_cast<std::uint8_t *>(image.pixelData.data());
