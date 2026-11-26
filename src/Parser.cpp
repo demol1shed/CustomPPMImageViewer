@@ -13,8 +13,8 @@
 #include <vector>
 
 namespace {
-constexpr uint MAX_THREAD_COUNT = 64;
-constexpr uint MIN_THREAD_COUNT = 1;
+constexpr unsigned MAX_THREAD_COUNT = 64;
+constexpr unsigned MIN_THREAD_COUNT = 1;
 
 // A single row cannot be split across workers; read serially. (Whether a
 // multi-row image is *worth* splitting is decided by ParallelThresholds.)
@@ -108,7 +108,7 @@ void ParseP3Range(const char *base, std::size_t N, std::size_t cs,
 // more than the number of rows (extra workers would only get empty ranges).
 // hardware_concurrency() may return 0 if undetectable; in that case we leave
 // the core cap off and let MaxUsableWorkers decide (serial when hw < 2).
-unsigned EffectiveThreadCount(uint requested, int height) {
+unsigned EffectiveThreadCount(unsigned requested, int height) {
   unsigned hw = std::thread::hardware_concurrency();
   unsigned eff = requested < MIN_THREAD_COUNT ? MIN_THREAD_COUNT : requested;
   if (eff > MAX_THREAD_COUNT)
@@ -123,14 +123,14 @@ unsigned EffectiveThreadCount(uint requested, int height) {
 // Upper bound on workers before any size gating: the clamped request, or 1
 // when threading is impossible/unsafe (a single row, or fewer than two
 // reported cores -- hardware_concurrency() == 0 means unknown -> stay serial).
-unsigned MaxUsableWorkers(uint requested, int height) {
+unsigned MaxUsableWorkers(unsigned requested, int height) {
   if (height < MIN_ROWS_FOR_THREADING ||
       std::thread::hardware_concurrency() < 2)
     return 1;
   return EffectiveThreadCount(requested, height);
 }
 
-void ReportWorkerClamp(bool verbose, uint requested, unsigned workers) {
+void ReportWorkerClamp(bool verbose, unsigned requested, unsigned workers) {
   if (verbose && workers != requested) {
     std::cout << "Note: requested " << requested << " thread(s), using "
               << workers << " (clamped to cores/rows/input size).\n";
@@ -247,7 +247,7 @@ std::size_t Parser::CountTokensInRange(const char *base, std::size_t totalBytes,
 }
 
 std::optional<Image> Parser::ParseFile(const std::string &filePath,
-                                       uint threadCount, bool verbose,
+                                       unsigned threadCount, bool verbose,
                                        const ParallelThresholds &thresholds) {
   std::ifstream file(filePath, std::ios::binary);
   if (!file.is_open()) {
