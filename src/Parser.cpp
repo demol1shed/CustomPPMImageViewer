@@ -254,9 +254,12 @@ std::vector<RowRange> Parser::ComputeRowRanges(int height, int threadCount) {
   // Because endRow(i) == startRow(i+1) by construction, adjacent ranges
   // telescope: no gaps, no overlaps. startRow(0) == 0 and
   // endRow(threadCount-1) == height, so the union is exactly [0, height).
+  // 64-bit products: i * height overflows int (UB) on very tall inputs. The
+  // quotient is at most height, so narrowing back is lossless.
   for (int i = 0; i < threadCount; ++i) {
-    int startRow = (i * height) / threadCount;
-    int endRow = ((i + 1) * height) / threadCount;
+    const long long index = i;
+    int startRow = static_cast<int>(index * height / threadCount);
+    int endRow = static_cast<int>((index + 1) * height / threadCount);
     ranges.push_back({startRow, endRow});
   }
   return ranges;
