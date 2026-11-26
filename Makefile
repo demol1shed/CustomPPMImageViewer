@@ -1,5 +1,13 @@
 CXX ?= c++
-CXXFLAGS = -I include -Wall -std=c++17 -g -pthread
+
+# Optimised by default; `make DEBUG=1` builds for debugging. Run `make clean`
+# when switching, because a flag change alone does not rebuild objects.
+ifeq ($(DEBUG),1)
+OPTFLAGS = -O0 -g
+else
+OPTFLAGS = -O2
+endif
+CXXFLAGS = -I include -Wall -Wextra -std=c++17 $(OPTFLAGS) -pthread
 LDFLAGS = -lSDL2 -pthread
 
 SRC = $(wildcard src/*.cpp)
@@ -96,8 +104,8 @@ smoke: $(TARGET)
 	else echo "Smoke test failed."; exit 1; fi
 
 # Parser load-time microbenchmark. Lives in bench/ (not tests/) so the
-# run_tests wildcard never links its main(). Built at -O2 (not the project's
-# default -g) so timings reflect release performance; links only src/Parser.cpp
+# run_tests wildcard never links its main(). Always built at -O2 (even with
+# DEBUG=1) so timings reflect release performance; links only src/Parser.cpp
 # (no SDL, like run_tests). Dev tool, not a CI gate.
 BENCH_SRC    = bench/bench_parser.cpp
 BENCH_TARGET = bench_parser
